@@ -137,9 +137,6 @@ func NewBerObjectIdentifierOfValue(value []int) *BerObjectIdentifier {
 			}
 		}
 
-	} else {
-		throw("invalid object identifier components")
 	}
-
 	return &BerObjectIdentifier{value: value, tag: NewBerTag(0, 0, 6)}
 }

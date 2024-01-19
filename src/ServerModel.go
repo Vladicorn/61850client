@@ -1,6 +1,7 @@
 package src
 
 import (
+	"errors"
 	"strings"
 )
 
@@ -284,12 +285,12 @@ func (m *ServerModel) findModelNode(objectReferenceStr string, fc string) ModelN
 	return currentNode
 }
 
-func (m *ServerModel) AskForFcModelNode(objectReferenceStr string, fc string) FcModelNodeI {
+func (m *ServerModel) AskForFcModelNode(objectReferenceStr string, fc string) (FcModelNodeI, error) {
 	modelNode := m.findModelNode(objectReferenceStr, fc)
 	if modelNode == nil {
-		throw("A model node with the given reference and functional constraint could not be found.")
+		return nil, errors.New("A model node with the given reference and functional constraint could not be found.")
 	}
 
-	return modelNode.(FcModelNodeI)
+	return modelNode.(FcModelNodeI), nil
 
 }

@@ -687,7 +687,7 @@ func (c *ClientAssociation) SetDataValues(node FcModelNodeI) {
 	c.decodeSetDataValuesResponse(confirmedServiceResponse)
 }
 
-//return error string
+// return error string
 func (c *ClientAssociation) SetDataSetValues(dataSet *DataSet) []string {
 	serviceRequest := c.constructSetDataSetValues(dataSet)
 	confirmedServiceResponse := c.encodeWriteReadDecode(serviceRequest)
