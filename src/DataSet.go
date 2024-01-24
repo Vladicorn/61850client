@@ -1,6 +1,8 @@
 package src
 
-import "strings"
+import (
+	"strings"
+)
 
 type DataSet struct {
 	Members          []FcModelNodeI

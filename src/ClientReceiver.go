@@ -2,7 +2,7 @@ package src
 
 import (
 	"bytes"
-	"fmt"
+	"log"
 	"strings"
 	"sync"
 )
@@ -19,7 +19,8 @@ type ClientReceiver struct {
 }
 
 func NewClientReceiver(maxMmsPduSize int, association *ClientAssociation) *ClientReceiver {
-	return &ClientReceiver{maxMmsPduSize: maxMmsPduSize, closed: false, expectedResponseId: -1, association: association, pduBuffer: bytes.NewBuffer(make([]byte, maxMmsPduSize+400)),
+	reportlist := NewClientEventListener()
+	return &ClientReceiver{maxMmsPduSize: maxMmsPduSize, closed: false, reportListener: reportlist, expectedResponseId: -1, association: association, pduBuffer: bytes.NewBuffer(make([]byte, maxMmsPduSize+400)),
 		lock: &sync.Mutex{}}
 }
 func (r *ClientReceiver) start() {
@@ -27,7 +28,7 @@ func (r *ClientReceiver) start() {
 }
 
 func (r *ClientReceiver) run() {
-	defer func() {
+	/*defer func() {
 		err := recover()
 		if err != nil {
 			var wg sync.WaitGroup
@@ -40,9 +41,11 @@ func (r *ClientReceiver) run() {
 				r.close(err)
 			}()
 			wg.Wait()
-			fmt.Printf("线程退出 %v", err)
+			fmt.Printf("线程退出 %v \n", err)
 		}
 	}()
+
+	*/
 
 	for {
 		r.pduBuffer.Reset()
@@ -52,15 +55,27 @@ func (r *ClientReceiver) run() {
 		decodedResponsePdu.decode(bytes.NewBuffer(buffer))
 
 		if decodedResponsePdu.unconfirmedPDU != nil {
+			ff := *decodedResponsePdu
+			value := ff.unconfirmedPDU.service.informationReport
+			//log.Println(ff)
+			for _, e := range value.listOfAccessResult.seqOf {
+				//	log.Println(e.success)
+				if e.success.visibleString != nil {
+					//	log.Println(string(e.success.visibleString.value))
+				}
+			}
+			//	log.Println(value.tag)
+			//	log.Println("_____")
 			if decodedResponsePdu.unconfirmedPDU.service.informationReport.variableAccessSpecification.listOfVariable != nil {
 				// Discarding LastApplError Report
 			} else {
 				if r.reportListener != nil {
-
 					report := r.processReport(decodedResponsePdu)
+					log.Println(report)
 					go func() {
 						r.reportListener.newReport(report)
 					}()
+
 				} else {
 					// discarding report because no ReportListener was registered.
 				}
@@ -157,39 +172,46 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 		throw("getReport: Error decoding server response")
 	}
 
-	listRes :=
-		unconfirmedServ.informationReport.listOfAccessResult.seqOf
-
+	listRes := unconfirmedServ.informationReport.listOfAccessResult.seqOf
 	index := 0
 
 	if listRes[index].success.visibleString == nil {
 		throw("processReport: report does not contain RptID")
 	}
-	index++
+
+	//RPTID - visible-string идентификатор отчета идентифицирует RCB, вызвавший создание отчета. Оно соответствует полю RptID RCB.
 	rptId := listRes[index].success.visibleString.toString()
 
+	//OptFlds - bit-string равно полю OptFlds соответствующего RCB.
+	index++
 	if listRes[index].success.bitString == nil {
 		throw("processReport: report does not contain OptFlds")
 	}
-
 	optFlds := NewBdaOptFlds(NewObjectReference("none"), "")
-	index++
-	optFlds.value = listRes[(index)].success.bitString.value
 
+	//if listRes[(index)].success.bitString != nil {
+	optFlds.value = listRes[(index)].success.bitString.value
+	//}
+
+	// SqNum порядковый номер отчета. На момент отправки оно равно полю SqNum соответствующего RCB.
+	//index++
 	var sqNum *int = nil
 	if optFlds.isSequenceNumber() {
 		index++
 		sqNum = &listRes[index].success.unsigned.value
 	}
 
+	//TimeOfEntry (необязательно, включается, если OptFlds.report-timestamp имеет значение true) — указывает время создания идентификатора записи.
 	var timeOfEntry *BdaEntryTime = nil
 	if optFlds.isReportTimestamp() {
-		timeOfEntry = NewBdaEntryTime(NewObjectReference("none"), "", "", false, false)
 		index++
+		timeOfEntry = NewBdaEntryTime(NewObjectReference("none"), "", "", false, false)
 		timeOfEntry.setValueFromMmsDataObj(listRes[index].success)
 	}
 
+	// DatSet (необязательно, включается, если OptFlds.dataset-name имеет значение true) — ссылка на набор данных, данные которого отправляются в этом отчете.
 	dataSetRef := ""
+
 	if optFlds.isDataSetName() {
 		index++
 		dataSetRef = listRes[index].success.visibleString.toString()
@@ -220,7 +242,10 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 	var bufOvfl *bool
 	if optFlds.isBufferOverflow() {
 		index++
-		bufOvfl = &listRes[index].success.bool.value
+		//TODO
+		if listRes[index].success.bool != nil {
+			bufOvfl = &listRes[index].success.bool.value
+		}
 	}
 
 	var entryId *BdaOctetString = nil
@@ -247,7 +272,12 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 	}
 
 	index++
-	inclusionBitString := listRes[index].success.bitString.getValueAsBooleans()
+
+	//TODO
+	inclusionBitString := make([]bool, 10, 10)
+	if listRes[index].success.bitString != nil {
+		inclusionBitString = listRes[index].success.bitString.getValueAsBooleans()
+	}
 	numMembersReported := 0
 
 	for _, bit := range inclusionBitString {

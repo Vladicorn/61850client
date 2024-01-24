@@ -215,6 +215,7 @@ func (p *SclParser) createAccessPoint(iedServer *etree.Element) (serverSap *Serv
 
 func (p *SclParser) createServerModel(serverXMLNode *etree.Element) (s *ServerModel, err error) {
 	elements := serverXMLNode.ChildElements()
+
 	logicalDevices := make([]*LogicalDevice, 0)
 	for _, element := range elements {
 		if element.Tag == ("LDevice") {
@@ -249,6 +250,7 @@ func (p *SclParser) createServerModel(serverXMLNode *etree.Element) (s *ServerMo
 }
 
 func (p *SclParser) createNewLDevice(ldXmlNode *etree.Element) (ld *LogicalDevice, err error) {
+
 	inst := ""
 	ldName := ""
 
@@ -367,6 +369,7 @@ func (p *SclParser) createNewLogicalNode(lnXmlNode *etree.Element, parentRef str
 			if err != nil {
 				return nil, err
 			}
+			//log.Println("tyya", rcb[0])
 			for _, item := range rcb {
 				dataObjects = append(dataObjects, item)
 			}

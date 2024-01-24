@@ -3,6 +3,7 @@ package src
 import "C"
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -246,11 +247,13 @@ func (c *ClientAssociation) encodeWriteReadDecode(serviceRequest *ConfirmedServi
 		if c.responseTimeout == 0 {
 			if len(c.incomingResponses) > 0 {
 				decodedResponsePdu = <-c.incomingResponses
+
 			}
 		} else {
 			timeOut := time.After(time.Duration(c.responseTimeout) * time.Millisecond)
 			select {
 			case decodedResponsePdu = <-c.incomingResponses:
+				log.Println(decodedResponsePdu.rejectPDU.tag)
 				break
 			case <-timeOut:
 				panic("time out")
@@ -698,10 +701,17 @@ func (c *ClientAssociation) constructSetDataValuesRequest(modelNode FcModelNodeI
 	variableAccessSpecification := c.constructVariableAccessSpecification(modelNode)
 
 	listOfData := NewListOfData()
+
+	/*
+		data := *modelNode.getMmsDataObj()
+		data.bool.value = true
+	*/
+
 	listOfData.seqOf = append(listOfData.seqOf, modelNode.getMmsDataObj())
 
 	writeRequest := NewWriteRequest()
 	writeRequest.listOfData = listOfData
+
 	writeRequest.variableAccessSpecification = variableAccessSpecification
 
 	confirmedServiceRequest := NewConfirmedServiceRequest()

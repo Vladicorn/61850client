@@ -8,7 +8,7 @@ import (
 
 func TestParseStream(t *testing.T) {
 	parser := NewSclParser()
-	file, err := ioutil.ReadFile("C:\\Users\\DragonMo\\GolandProjects\\Go61850Client\\iec61850bean-sample01.icd")
+	file, err := ioutil.ReadFile(".././iec61850bean-sample01.icd")
 	if err != nil {
 		panic(err)
 	}

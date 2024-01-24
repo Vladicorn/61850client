@@ -24,6 +24,11 @@ func (b *BdaBitString) setValueFromMmsDataObj(data *Data) {
 	b.value = data.bitString.value
 }
 
+func (b *BdaBitString) SetValue(data []byte) {
+
+	b.value = data
+}
+
 func NewBdaBitString(objectReference *ObjectReference, fc string, sAddr string, maxNumBits int, dchg bool, dupd bool) *BdaBitString {
 	attribute := NewBasicDataAttribute(objectReference, fc, sAddr, dchg, dupd)
 	b := &BdaBitString{BasicDataAttribute: *attribute}

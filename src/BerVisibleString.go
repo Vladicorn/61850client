@@ -1,6 +1,8 @@
 package src
 
-import "bytes"
+import (
+	"bytes"
+)
 
 type BerVisibleString struct {
 	value []byte
@@ -35,6 +37,11 @@ func (s *BerVisibleString) encode(reverseOS *ReverseByteArrayOutputStream, withT
 }
 
 func (s *BerVisibleString) toString() string {
+	// TODO
+	if s == nil {
+		return "160"
+	}
+
 	return string(s.value)
 }
 
