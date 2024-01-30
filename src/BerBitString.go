@@ -1,6 +1,8 @@
 package src
 
-import "bytes"
+import (
+	"bytes"
+)
 
 type BerBitString struct {
 	value   []byte
@@ -53,6 +55,20 @@ func (o *BerBitString) getValueAsBooleans() []bool {
 
 		return booleans
 	}
+}
+
+func (o *BerBitString) bitCheck() []bool {
+	o.numBits = 8
+
+	booleans := make([]bool, o.numBits)
+	//floatResult := math.Pow(2, float64(bit-1)) //type cast int to float64
+	for i := 0; i < o.numBits; i++ {
+		bitMask := 1 << i
+
+		booleans[i] = (byte(bitMask) & o.value[0]) > 0
+
+	}
+	return booleans
 }
 
 func (o *BerBitString) decode(is *bytes.Buffer, withTag bool) int {

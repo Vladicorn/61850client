@@ -1,6 +1,9 @@
 package src
 
-import "strconv"
+import (
+	"log"
+	"strconv"
+)
 
 type BdaBitString struct {
 	BasicDataAttribute
@@ -15,8 +18,11 @@ func (b *BdaBitString) getMmsDataObj() *Data {
 }
 
 func (b *BdaBitString) setValueFromMmsDataObj(data *Data) {
+
 	if data.bitString == nil {
-		throw("ServiceError.TYPE_CONFLICT expected type: bit_string")
+		log.Println("ServiceError.TYPE_CONFLICT expected type: bit_string")
+		return
+		//	throw("ServiceError.TYPE_CONFLICT expected type: bit_string")
 	}
 	if data.bitString.numBits > b.maxNumBits {
 		throw("ServiceError.TYPE_CONFLICT : bit_string is bigger than type's size: " + strconv.Itoa(data.bitString.numBits) + ">" + strconv.Itoa(b.maxNumBits))

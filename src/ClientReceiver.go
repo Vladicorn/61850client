@@ -19,8 +19,7 @@ type ClientReceiver struct {
 }
 
 func NewClientReceiver(maxMmsPduSize int, association *ClientAssociation) *ClientReceiver {
-	reportlist := NewClientEventListener()
-	return &ClientReceiver{maxMmsPduSize: maxMmsPduSize, closed: false, reportListener: reportlist, expectedResponseId: -1, association: association, pduBuffer: bytes.NewBuffer(make([]byte, maxMmsPduSize+400)),
+	return &ClientReceiver{maxMmsPduSize: maxMmsPduSize, closed: false, reportListener: association.reportListener, expectedResponseId: -1, association: association, pduBuffer: bytes.NewBuffer(make([]byte, maxMmsPduSize+400)),
 		lock: &sync.Mutex{}}
 }
 func (r *ClientReceiver) start() {
@@ -55,23 +54,13 @@ func (r *ClientReceiver) run() {
 		decodedResponsePdu.decode(bytes.NewBuffer(buffer))
 
 		if decodedResponsePdu.unconfirmedPDU != nil {
-			ff := *decodedResponsePdu
-			value := ff.unconfirmedPDU.service.informationReport
-			//log.Println(ff)
-			for _, e := range value.listOfAccessResult.seqOf {
-				//	log.Println(e.success)
-				if e.success.visibleString != nil {
-					//	log.Println(string(e.success.visibleString.value))
-				}
-			}
-			//	log.Println(value.tag)
-			//	log.Println("_____")
+
 			if decodedResponsePdu.unconfirmedPDU.service.informationReport.variableAccessSpecification.listOfVariable != nil {
 				// Discarding LastApplError Report
 			} else {
+
 				if r.reportListener != nil {
 					report := r.processReport(decodedResponsePdu)
-					log.Println(report)
 					go func() {
 						r.reportListener.newReport(report)
 					}()
@@ -189,20 +178,20 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 	}
 	optFlds := NewBdaOptFlds(NewObjectReference("none"), "")
 
-	//if listRes[(index)].success.bitString != nil {
 	optFlds.value = listRes[(index)].success.bitString.value
-	//}
 
 	// SqNum порядковый номер отчета. На момент отправки оно равно полю SqNum соответствующего RCB.
 	//index++
 	var sqNum *int = nil
 	if optFlds.isSequenceNumber() {
+		log.Println("isSequenceNumber")
 		index++
 		sqNum = &listRes[index].success.unsigned.value
 	}
 
 	//TimeOfEntry (необязательно, включается, если OptFlds.report-timestamp имеет значение true) — указывает время создания идентификатора записи.
 	var timeOfEntry *BdaEntryTime = nil
+
 	if optFlds.isReportTimestamp() {
 		index++
 		timeOfEntry = NewBdaEntryTime(NewObjectReference("none"), "", "", false, false)
@@ -241,6 +230,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	var bufOvfl *bool
 	if optFlds.isBufferOverflow() {
+		log.Println("bufOvfl")
 		index++
 		//TODO
 		if listRes[index].success.bool != nil {
@@ -250,6 +240,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	var entryId *BdaOctetString = nil
 	if optFlds.isEntryId() {
+		log.Println("entityId")
 		entryId = NewBdaOctetString(NewObjectReference("none"), "", "", 8, false, false)
 		index++
 		entryId.setValue(listRes[index].success.octetString.value)
@@ -257,7 +248,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	var confRev *int = nil
 	if optFlds.isConfigRevision() {
-
+		log.Println("confRev")
 		index++
 		confRev = &listRes[index].success.unsigned.value
 	}
@@ -265,6 +256,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 	var subSqNum *int = nil
 	moreSegmentsFollow := false
 	if optFlds.isSegmentation() {
+		log.Println("subSqNum")
 		index++
 		subSqNum = &listRes[index].success.unsigned.value
 		index++
@@ -273,56 +265,71 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	index++
 
-	//TODO
-	inclusionBitString := make([]bool, 10, 10)
-	if listRes[index].success.bitString != nil {
-		inclusionBitString = listRes[index].success.bitString.getValueAsBooleans()
-	}
+	inclusionBitString := listRes[index].success.bitString.bitCheck()
 	numMembersReported := 0
-
+	//log.Println("inclusionBitString", listRes[index].success.bitString)
 	for _, bit := range inclusionBitString {
 		if bit {
 			numMembersReported++
 		}
 	}
 
+	dataReference := make([]string, len(inclusionBitString))
 	if optFlds.isDataReference() {
 		// this is just to move the index to the right place
 		// The next part will process the changes to the values
 		// without the dataRefs
 		index += numMembersReported
+		/*for ind := 0; ind < len(inclusionBitString); ind++ {
+			index++
+			dataReference[ind] = strings.ReplaceAll(listRes[index].success.visibleString.toString(), "$", ".")
+		}
+
+		*/
 	}
 
 	reportedDataSetMembers := make([]FcModelNodeI, 0)
+	reportedDataSetMembersMap := make(map[string]FcModelNodeI)
 	//reportedDataSetMembers := make([]*FcModelNode, numMembersReported)
-	dataSetIndex := 0
+	dataSetIndex := 7
+	index++
+
 	for _, dataSetMember := range dataSet.getMembers() {
 		if inclusionBitString[dataSetIndex] {
-			index++
 			accessRes := listRes[index]
+			//log.Println("access ", accessRes.success.structure.seqOf)
 
 			//TPDO
-			dataSetMemberCopy := dataSetMember.copy()
-			dataSetMemberCopy.setValueFromMmsDataObj(accessRes.success)
-			reportedDataSetMembers = append(reportedDataSetMembers, dataSetMemberCopy.(FcModelNodeI))
+			//dataSetMemberCopy := dataSetMember.copy()
+			log.Println(accessRes.success)
+			dataSetMember.setValueFromMmsDataObj(accessRes.success)
+			reportedDataSetMembers = append(reportedDataSetMembers, dataSetMember.(FcModelNodeI))
+			reportedDataSetMembersMap[strings.ReplaceAll(listRes[index-numMembersReported].success.visibleString.toString(), "$", ".")] = dataSetMember.(FcModelNodeI)
+
+			index++
 		}
-		dataSetIndex++
+
+		dataSetIndex--
 	}
 
 	var reasonCodes []*BdaReasonForInclusion = nil
 	if optFlds.isReasonForInclusion() {
-		//reasonCodes = make([]*BdaReasonForInclusion, len(DataSets.getMembers()))
-		reasonCodes = make([]*BdaReasonForInclusion, 0)
-		for i := 0; i < len(dataSet.getMembers()); i++ {
-			if inclusionBitString[i] {
+		/*
+			//reasonCodes = make([]*BdaReasonForInclusion, len(DataSets.getMembers()))
+			reasonCodes = make([]*BdaReasonForInclusion, 0)
+			for i := 0; i < len(dataSet.getMembers()); i++ {
+				if inclusionBitString[i] {
+					reasonForInclusion := NewBdaReasonForInclusion(nil)
+					reasonCodes = append(reasonCodes, reasonForInclusion)
+					index++
+					reason := listRes[index].success.bitString.value
+					reasonForInclusion.value = reason
 
-				reasonForInclusion := NewBdaReasonForInclusion(nil)
-				reasonCodes = append(reasonCodes, reasonForInclusion)
-				index++
-				reason := listRes[index].success.bitString.value
-				reasonForInclusion.value = reason
+				}
 			}
-		}
+
+		*/
+
 	}
 
 	return NewReport(
@@ -337,7 +344,10 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 		entryId,
 		inclusionBitString,
 		reportedDataSetMembers,
-		reasonCodes)
+		reasonCodes,
+		dataReference,
+		reportedDataSetMembersMap,
+	)
 }
 
 func (r *ClientReceiver) removeExpectedResponse() *MMSpdu {

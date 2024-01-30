@@ -55,6 +55,7 @@ func (i *BdaFloat32) setValueFromMmsDataObj(data *Data) {
 	if data.FloatingPoint == nil || len(data.FloatingPoint.value) != 5 {
 		throw("ServiceError.TYPE_CONFLICT expected type: floating_point as an octet string of size 5")
 	}
+
 	i.value = data.FloatingPoint.value
 }
 

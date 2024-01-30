@@ -22,7 +22,12 @@ type ModelNode struct {
 }
 
 func (m *ModelNode) copy() ModelNodeI {
-	panic("impl me")
+	modelNodeI := NewModelNode()
+	modelNodeI.desc = m.desc
+	modelNodeI.Children = m.Children
+	modelNodeI.parent = m.parent
+	modelNodeI.ObjectReference = m.ObjectReference
+	return modelNodeI
 }
 func (m *ModelNode) getMmsDataObj() *Data {
 	panic("impl me")

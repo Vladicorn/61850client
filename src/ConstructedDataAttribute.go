@@ -1,6 +1,9 @@
 package src
 
-import "strconv"
+import (
+	"log"
+	"strconv"
+)
 
 type ConstructedDataAttribute struct {
 	FcModelNode
@@ -29,19 +32,111 @@ func (c *ConstructedDataAttribute) getMmsDataObj() *Data {
 }
 
 func (c *ConstructedDataAttribute) setValueFromMmsDataObj(data *Data) {
+	//	log.Println("ConstructedDataAttribute", len(data.structure.seqOf))
+
 	if data.structure == nil {
+		log.Println("ServiceError.TYPE_CONFLICT expected type: structure")
+		return
 		throw("ServiceError.TYPE_CONFLICT expected type: structure")
 	}
 	if len(data.structure.seqOf) != len(c.Children) {
+		return
 		throw("ServiceError.TYPE_CONFLICT expected type: structure with " + strconv.Itoa(len(c.Children)) + " elements")
 	}
-
 	i := 0
+
 	for _, child := range c.Children {
-		child.setValueFromMmsDataObj(data.structure.seqOf[i])
+		if _, ok := child.(*ConstructedDataAttribute); ok {
+			for _, data1 := range data.structure.seqOf {
+				if data1.structure != nil {
+					child.setValueFromMmsDataObj(data1)
+				}
+			}
+		}
+
+		if _, ok := child.(*BdaQuality); ok {
+			for _, data1 := range data.structure.seqOf {
+				if data1.bitString != nil {
+					child.setValueFromMmsDataObj(data1)
+				}
+			}
+		}
+
+		if _, ok := child.(*BdaInt8U); ok {
+			for _, data1 := range data.structure.seqOf {
+				if data1.unsigned != nil {
+					child.setValueFromMmsDataObj(data1)
+				}
+			}
+		}
+
+		if _, ok := child.(*BdaInt8); ok {
+			for _, data1 := range data.structure.seqOf {
+				if data1.integer != nil {
+					child.setValueFromMmsDataObj(data1)
+				}
+			}
+		}
+
+		if _, ok := child.(*BdaInt32); ok {
+			for _, data1 := range data.structure.seqOf {
+				if data1.integer != nil {
+					child.setValueFromMmsDataObj(data1)
+				}
+			}
+		}
+
+		if _, ok := child.(*BdaFloat32); ok {
+			for _, data1 := range data.structure.seqOf {
+				if data1.FloatingPoint != nil {
+					child.setValueFromMmsDataObj(data1)
+				}
+			}
+		}
+
+		if _, ok := child.(*BdaFloat64); ok {
+			for _, data1 := range data.structure.seqOf {
+				if data1.FloatingPoint != nil {
+					//log.Println("BdaFloat64")
+					child.setValueFromMmsDataObj(data1)
+				}
+			}
+		}
+
+		if _, ok := child.(*BdaTimestamp); ok {
+			for _, data1 := range data.structure.seqOf {
+				if data1.utcTime != nil {
+					child.setValueFromMmsDataObj(data1)
+				}
+			}
+		}
+
+		if _, ok := child.(*BdaDoubleBitPos); ok {
+			for _, data1 := range data.structure.seqOf {
+				log.Println("BdaDoubleBitPos", data1)
+			}
+		}
+
 		i++
 	}
 
+}
+
+func (c *ConstructedDataAttribute) parceStructure(data *Data) {
+	if data.bitString != nil {
+		i := 0
+		for _, child := range c.Children {
+			child.setValueFromMmsDataObj(data.structure.seqOf[i])
+			i++
+		}
+	}
+	if data.utcTime != nil {
+		i := 0
+		for _, child := range c.Children {
+			child.setValueFromMmsDataObj(data.structure.seqOf[i])
+			i++
+		}
+	}
 }
 
 func (c *ConstructedDataAttribute) copy() ModelNodeI {

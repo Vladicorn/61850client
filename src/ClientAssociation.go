@@ -15,7 +15,7 @@ type ClientAssociation struct {
 	ServerModel           *ServerModel
 	responseTimeout       int
 	negotiatedMaxPduSize  int
-	reportListener        *EventListener
+	reportListener        *ClientEventListener
 	AcseAssociation       *AcseAssociation
 	clientReceiver        *ClientReceiver
 	servicesSupported     []byte
@@ -29,7 +29,7 @@ type ClientAssociation struct {
 
 func NewClientAssociation(address string, port int, acseSap *ClientAcseSap, proposedMaxPduSize int,
 	proposedMaxServOutstandingCalling int, proposedMaxServOutstandingCalled int, proposedDataStructureNestingLevel int,
-	servicesSupportedCalling []byte, responseTimeout int, messageFragmentTimeout int, reportListener *EventListener) *ClientAssociation {
+	servicesSupportedCalling []byte, responseTimeout int, messageFragmentTimeout int, reportListener *ClientEventListener) *ClientAssociation {
 
 	c := &ClientAssociation{}
 	c.lock = &sync.Mutex{}
@@ -133,7 +133,7 @@ func (c *ClientAssociation) Close() {
 	if c.Closed == false {
 		c.Closed = true
 		go c.AcseAssociation.disconnect()
-		go c.reportListener.associationClosed()
+		//	go c.reportListener.associationClosed()
 
 		//mmsPdu := NewMMSpdu()
 		//mmsPdu.confirmedRequestPDU = NewConfirmedRequestPDU()

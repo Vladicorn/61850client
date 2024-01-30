@@ -1,6 +1,9 @@
 package src
 
-import "strconv"
+import (
+	"log"
+	"strconv"
+)
 
 type BdaTimestamp struct {
 	BasicDataAttribute
@@ -28,8 +31,11 @@ func (f *BdaTimestamp) copy() ModelNodeI {
 }
 
 func (t *BdaTimestamp) setValueFromMmsDataObj(data *Data) {
+
 	if data.utcTime == nil {
-		throw("ServiceError.TYPE_CONFLICT expected type: utc_time/timestamp")
+		log.Println("ServiceError.TYPE_CONFLICT expected type: utc_time/timestamp")
+		return
+		//throw("ServiceError.TYPE_CONFLICT expected type: utc_time/timestamp")
 	}
 	t.value = data.utcTime.value
 }

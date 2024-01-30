@@ -14,7 +14,7 @@ func NewClientSap() *ClientSap {
 	return r
 }
 
-func (c *ClientSap) Associate(address string, port int, eventListener *EventListener) *ClientAssociation {
+func (c *ClientSap) Associate(address string, port int, eventListener *ClientEventListener) *ClientAssociation {
 	clientAssociation :=
 		NewClientAssociation(
 			address,

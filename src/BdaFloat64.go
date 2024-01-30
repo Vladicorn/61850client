@@ -1,6 +1,8 @@
 package src
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type BdaFloat64 struct {
 	BasicDataAttribute
@@ -30,7 +32,6 @@ func (s *BdaFloat64) copy() ModelNodeI {
 }
 
 func (i *BdaFloat64) setValueFromMmsDataObj(data *Data) {
-
 	if data.FloatingPoint == nil || len(data.FloatingPoint.value) != 9 {
 		throw("ServiceError.TYPE_CONFLICT expected type: floating_point as an octet string of size 9")
 	}
