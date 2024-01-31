@@ -57,16 +57,22 @@ func (o *BerBitString) getValueAsBooleans() []bool {
 	}
 }
 
-func (o *BerBitString) bitCheck() []bool {
-	o.numBits = 8
+func (o *BerBitString) bitCheck(length int) []bool {
+	o.numBits = length + 1
 
 	booleans := make([]bool, o.numBits)
+	indexArray := 0
+	indexVal := 0
+
 	//floatResult := math.Pow(2, float64(bit-1)) //type cast int to float64
 	for i := 0; i < o.numBits; i++ {
-		bitMask := 1 << i
-
-		booleans[i] = (byte(bitMask) & o.value[0]) > 0
-
+		bitMask := 1 << indexVal
+		booleans[i] = (byte(bitMask) & o.value[indexArray]) > 0
+		indexVal++
+		if indexVal > 8 {
+			indexArray++
+			indexVal = 0
+		}
 	}
 	return booleans
 }

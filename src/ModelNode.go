@@ -62,6 +62,7 @@ func (m *ModelNode) getObjectReference() *ObjectReference {
 }
 
 func (m *ModelNode) getName() string {
+
 	return m.ObjectReference.getName()
 
 }

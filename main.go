@@ -16,23 +16,30 @@ func main() {
 	association := clientSap.Associate("192.168.0.67", 102, event)
 
 	ticker := time.NewTicker(500 * time.Millisecond)
-
-	/*err := subscribeOnDataset(association,
-	"DemoMeasurement/LLN0$DS1_Measurement", "DemoMeasurement/LLN0.urcb1",
-	true)
+	err := subscribeOnDatasetBuff(association,
+		"Bresler45LD1/LLN0.DS_RDRE", "Bresler45LD1/LLN0.brcbA01",
+		false)
+	/*
+		err := subscribeOnDataset(association,
+			"DemoMeasurement/LLN0$DS1_Measurement", "DemoMeasurement/LLN0.urcb1",
+			true)
 
 
 	*/
 	/*
 		err := subscribeOnDataset(association,
-			"Bresler1LD1/LLN0$DS_RDRE", "Bresler1LD1/LLN0.urcbC02",
+			"Bresler43LD1/LLN0$DS_AIn", "Bresler43LD1/LLN0.urcbH01",
 			true)
 
-	*/
-	err := subscribeOnDataset(association,
-		"D001CTRL/LLN0$ds_A", "D001CTRL/LLN0.urcbCTRL_C01",
-		false)
 
+	*/
+	/*
+		err := subscribeOnDataset(association,
+			"D001CTRL/LLN0$ds_A", "D001CTRL/LLN0.urcbCTRL_C01",
+			true)
+
+
+	*/
 	/*
 		err := subscribeOnDataset(association,
 			"ied1lDevice1/LLN0$dataset1", "ied1lDevice1/LLN0.urcb102",
@@ -195,6 +202,7 @@ func subscribeOnDataset(association *src.ClientAssociation, dataset string, repo
 	// добавить тэг TrgOps - указывает, какие события будут вызывать отчеты. Возможные события:
 
 	serverModel := association.RetrieveModel()
+
 	//1
 
 	fcModelNode, err := serverModel.AskForFcModelNode(fmt.Sprintf("%s.Resv", report), "RP")
@@ -203,15 +211,17 @@ func subscribeOnDataset(association *src.ClientAssociation, dataset string, repo
 	}
 	fcModelNode.(*src.BdaBoolean).SetValue(true)
 	association.SetDataValues(fcModelNode)
+	/*
+		//2
+		fcModelNode2, err := serverModel.AskForFcModelNode(report+".DatSet", "RP")
+		if err != nil {
+			return err
+		}
 
-	//2
-	fcModelNode2, err := serverModel.AskForFcModelNode(report+".DatSet", "RP")
-	if err != nil {
-		return err
-	}
+		fcModelNode2.(*src.BdaVisibleString).SetValue(dataset)
+		association.SetDataValues(fcModelNode2)
 
-	fcModelNode2.(*src.BdaVisibleString).SetValue(dataset)
-	association.SetDataValues(fcModelNode2)
+	*/
 
 	//4
 	fcModelNode6, err := serverModel.AskForFcModelNode(report+".OptFlds", "RP")
@@ -264,7 +274,93 @@ func subscribeOnDataset(association *src.ClientAssociation, dataset string, repo
 	association.SetDataValues(fcModelNode5)
 	return nil
 }
+func subscribeOnDatasetBuff(association *src.ClientAssociation, dataset string, report string, firstGet bool) error {
+	// добавить тэг TrgOps - указывает, какие события будут вызывать отчеты. Возможные события:
 
+	serverModel := association.RetrieveModel()
+
+	/*
+		//1
+
+		fcModelNode, err := serverModel.AskForFcModelNode(fmt.Sprintf("%s.Resv", report), "RP")
+		if err != nil {
+			return err
+		}
+		fcModelNode.(*src.BdaBoolean).SetValue(true)
+		association.SetDataValues(fcModelNode)
+
+	*/
+
+	//2
+	/*fcModelNode2, err := serverModel.AskForFcModelNode(report+".DatSet", "BR")
+	if err != nil {
+		return err
+	}
+
+	fcModelNode2.(*src.BdaVisibleString).SetValue(dataset)
+	association.SetDataValues(fcModelNode2)
+
+
+	*/
+	//4
+	fcModelNode6, err := serverModel.AskForFcModelNode(report+".TrgOps", "BR")
+	if err != nil {
+		return err
+	}
+	optops := make([]byte, 1)
+	optops[0] = 124
+
+	fcModelNode6.(*src.BdaTriggerConditions).SetValue(optops)
+	association.SetDataValues(fcModelNode6)
+
+	/*
+		//4
+		fcModelNode6, err := serverModel.AskForFcModelNode(report+".OptFlds", "RP")
+		if err != nil {
+			return err
+		}
+		optops := make([]byte, 2)
+		optops[0] = 124
+		optops[1] = 0
+
+		fcModelNode6.(*src.BdaOptFlds).SetValue(optops)
+		association.SetDataValues(fcModelNode6)
+
+
+	*/
+	//3
+	fcModelNode1, err := serverModel.AskForFcModelNode(report+".RptEna", "BR")
+	if err != nil {
+		return err
+	}
+	fcModelNode1.(*src.BdaBoolean).SetValue(true)
+	association.SetDataValues(fcModelNode1)
+
+	/*
+		//4
+		fcModelNode6, err := serverModel.AskForFcModelNode(report+".TrgOps", "RP")
+		if err != nil {
+			return err
+		}
+		trgops := make([]byte, 2)
+		trgops[0] = 124
+		trgops[1] = 0
+
+		fcModelNode6.(*src.BdaTriggerConditions).SetValue(trgops)
+		association.SetDataValues(fcModelNode6)
+
+	*/
+
+	//5
+	fcModelNode4, err := serverModel.AskForFcModelNode(report+".GI", "BR")
+	if err != nil {
+		return err
+	}
+	fcModelNode4.(*src.BdaBoolean).SetValue(firstGet)
+	association.SetDataValues(fcModelNode4)
+
+	return nil
+}
 func readValue(association *src.ClientAssociation) error {
 	serverModel := association.RetrieveModel()
 

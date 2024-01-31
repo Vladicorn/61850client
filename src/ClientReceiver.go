@@ -108,14 +108,22 @@ func (r *ClientReceiver) run() {
 				if r.expectedResponseId == -1 {
 					// Discarding ConfirmedResponse MMS PDU because no listener for request was found.
 					return
-				} else if decodedResponsePdu.confirmedResponsePDU.invokeID.value != r.expectedResponseId {
-					// Discarding ConfirmedResponse MMS PDU because no listener with fitting invokeID
-					// was
-					// found.
-					return
+				} else if decodedResponsePdu.confirmedResponsePDU != nil {
+					if decodedResponsePdu.confirmedResponsePDU.invokeID.value != r.expectedResponseId {
+						// Discarding ConfirmedResponse MMS PDU because no listener with fitting invokeID
+						// was
+						// found.
+						log.Println("Close")
+						return
+					} else {
+						r.association.incomingResponses <- decodedResponsePdu
+					}
 				} else {
-					r.association.incomingResponses <- decodedResponsePdu
+					log.Println("close")
+					r.association.Close()
+					return
 				}
+
 			}()
 
 		}
@@ -129,6 +137,7 @@ func (r *ClientReceiver) close(err any) {
 	defer r.lock.Unlock()
 	if r.closed == false {
 		r.closed = true
+
 		r.association.AcseAssociation.disconnect()
 
 		if r.reportListener != nil {
@@ -265,7 +274,14 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	index++
 
-	inclusionBitString := listRes[index].success.bitString.bitCheck()
+	//countBit := 223
+	countBit := len(listRes[index].success.bitString.value) * 8
+	/*if len(listRes[index].success.bitString.value) > 7 {
+		countBit = len(listRes[index].success.bitString.value)
+	}
+	*/
+	inclusionBitString := listRes[index].success.bitString.bitCheck(countBit)
+	log.Println(listRes[index].success.bitString.value)
 	numMembersReported := 0
 	//log.Println("inclusionBitString", listRes[index].success.bitString)
 	for _, bit := range inclusionBitString {
@@ -291,9 +307,9 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 	reportedDataSetMembers := make([]FcModelNodeI, 0)
 	reportedDataSetMembersMap := make(map[string]FcModelNodeI)
 	//reportedDataSetMembers := make([]*FcModelNode, numMembersReported)
-	dataSetIndex := 7
+	dataSetIndex := countBit
 	index++
-
+	//	index = index + 2
 	for _, dataSetMember := range dataSet.getMembers() {
 		if inclusionBitString[dataSetIndex] {
 			accessRes := listRes[index]
@@ -301,14 +317,14 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 			//TPDO
 			//dataSetMemberCopy := dataSetMember.copy()
-			log.Println(accessRes.success)
+			//	log.Println(dataSetMember.getMmsDataObj())
+			//	log.Println(accessRes.success)
 			dataSetMember.setValueFromMmsDataObj(accessRes.success)
 			reportedDataSetMembers = append(reportedDataSetMembers, dataSetMember.(FcModelNodeI))
 			reportedDataSetMembersMap[strings.ReplaceAll(listRes[index-numMembersReported].success.visibleString.toString(), "$", ".")] = dataSetMember.(FcModelNodeI)
 
 			index++
 		}
-
 		dataSetIndex--
 	}
 

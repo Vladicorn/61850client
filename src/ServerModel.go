@@ -74,7 +74,6 @@ func NewServerModel(logicalDevices []*LogicalDevice, dataSets []*DataSet) *Serve
 			}
 		}
 	}
-
 	return m
 
 }
