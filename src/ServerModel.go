@@ -69,6 +69,7 @@ func NewServerModel(logicalDevices []*LogicalDevice, dataSets []*DataSet) *Serve
 				urcb.dataSet = m.GetDataSet(strings.ReplaceAll(urcb.getDatSet().getStringValue(), "$", "."))
 			}
 			for _, brcb := range l.brcbs {
+				//	log.Println(brcb.getRptId())
 				m.brcbs[brcb.ObjectReference.toString()] = brcb
 				brcb.dataSet = m.GetDataSet(strings.ReplaceAll(brcb.getDatSet().getStringValue(), "$", "."))
 			}

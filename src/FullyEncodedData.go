@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -42,7 +43,7 @@ func (d *FullyEncodedData) encode(reverseOS *ReverseByteArrayOutputStream, withT
 	return codeLength
 }
 
-func (d *FullyEncodedData) decode(is *bytes.Buffer, withTag bool) int {
+func (d *FullyEncodedData) decode(is *bytes.Buffer, withTag bool) (int, error) {
 	tlByteCount := 0
 	vByteCount := 0
 	berTag := NewEmptyBerTag()
@@ -63,16 +64,21 @@ func (d *FullyEncodedData) decode(is *bytes.Buffer, withTag bool) int {
 		}
 
 		if !berTag.equals(0, 32, 16) {
-			throw("tag does not match mandatory sequence of/set of component.")
+			errors.New("tag does not match mandatory sequence of/set of component")
 		}
 		element := NewPDVList()
-		vByteCount += element.decode(is, false)
+		vByteCountD, err := element.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		vByteCount += vByteCountD
 		d.seqOf = append(d.seqOf, element)
 	}
 	if lengthVal >= 0 && vByteCount != lengthVal {
-		throw("Decoded SequenceOf or SetOf has wrong length. Expected ", strconv.Itoa(lengthVal), " but has ", strconv.Itoa(vByteCount))
+
+		errors.New("Decoded SequenceOf or SetOf has wrong length. Expected " + strconv.Itoa(lengthVal) + " but has " + strconv.Itoa(vByteCount))
 	}
-	return tlByteCount + vByteCount
+	return tlByteCount + vByteCount, nil
 }
 
 func NewFullyEncodedData() *FullyEncodedData {

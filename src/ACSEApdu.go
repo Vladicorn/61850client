@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 )
 
 type ACSEApdu struct {
@@ -22,7 +23,7 @@ func (a *ACSEApdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 	return -1
 }
 
-func (a *ACSEApdu) decode(is *bytes.Buffer, berTag *BerTag) int {
+func (a *ACSEApdu) decode(is *bytes.Buffer, berTag *BerTag) (int, error) {
 
 	tlvByteCount := 0
 	tagWasPassed := berTag != nil
@@ -34,35 +35,49 @@ func (a *ACSEApdu) decode(is *bytes.Buffer, berTag *BerTag) int {
 
 	if berTag.equals(64, 32, 0) {
 		a.aarq = NewAARQApdu()
-		tlvByteCount += a.aarq.decode(is, false)
-		return tlvByteCount
+		tlvByteCountD, err := a.aarq.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		tlvByteCount += tlvByteCountD
+		return tlvByteCount, nil
 	}
 
 	if berTag.equals(64, 32, 1) {
 		a.aare = NewAAREApdu()
-		tlvByteCount += a.aare.decode(is, false)
-		return tlvByteCount
+		tlvByteCountD, err := a.aare.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		tlvByteCount += tlvByteCountD
+		return tlvByteCount, nil
 	}
 
 	if berTag.equals(64, 32, 2) {
 		a.rlrq = NewRLRQApdu()
-		tlvByteCount += a.rlrq.decode(is, false)
-		return tlvByteCount
+		tlvByteCountD, err := a.rlrq.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		tlvByteCount += tlvByteCountD
+		return tlvByteCount, nil
 	}
 
 	if berTag.equals(64, 32, 3) {
 		a.rlre = NewRLREApdu()
-		tlvByteCount += a.rlre.decode(is, false)
-		return tlvByteCount
+		tlvByteCountD, err := a.rlre.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		tlvByteCount += tlvByteCountD
+		return tlvByteCount, nil
 	}
 
 	if tagWasPassed {
-		return 0
+		return 0, nil
 	}
 
-	throw("Error decoding WriteResponseCHOICE: tag ", berTag.toString(), " matched to no item.")
-
-	return 0
+	return 0, errors.New("Error decoding WriteResponseCHOICE: tag " + berTag.toString() + " matched to no item.")
 }
 
 func NewACSEApdu() *ACSEApdu {

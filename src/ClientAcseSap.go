@@ -8,11 +8,11 @@ type ClientAcseSap struct {
 	tSap *ClientTSap
 }
 
-func (s *ClientAcseSap) associate(address string, port int, apdu *bytes.Buffer) *AcseAssociation {
+func (s *ClientAcseSap) associate(address string, port int, apdu *bytes.Buffer) (*AcseAssociation, error) {
 
 	a := NewAcseAssociation(nil, []byte{0, 0, 0, 1})
 
-	a.startAssociation(
+	err := a.startAssociation(
 		apdu,
 		address,
 		port,
@@ -24,6 +24,9 @@ func (s *ClientAcseSap) associate(address string, port int, apdu *bytes.Buffer) 
 		[]int{1, 1, 999, 1},
 		12,
 		12)
+	if err != nil {
+		return nil, err
+	}
 
 	defer func() {
 		r := recover()
@@ -32,7 +35,7 @@ func (s *ClientAcseSap) associate(address string, port int, apdu *bytes.Buffer) 
 			panic(r)
 		}
 	}()
-	return a
+	return a, nil
 }
 
 func newClientAcseSap() *ClientAcseSap {

@@ -1,6 +1,9 @@
 package src
 
-import "bytes"
+import (
+	"bytes"
+	"errors"
+)
 
 type MyexternalEncoding struct {
 	singleASN1Type *BerAny
@@ -48,7 +51,7 @@ func (e *MyexternalEncoding) encode(reverseOS *ReverseByteArrayOutputStream) int
 	return 0
 }
 
-func (e *MyexternalEncoding) decode(is *bytes.Buffer, berTag *BerTag) int {
+func (e *MyexternalEncoding) decode(is *bytes.Buffer, berTag *BerTag) (int, error) {
 
 	tlvByteCount := 0
 	tagWasPassed := berTag != nil
@@ -63,29 +66,32 @@ func (e *MyexternalEncoding) decode(is *bytes.Buffer, berTag *BerTag) int {
 		length := NewBerLength()
 		tlvByteCount += length.decode(is)
 		e.singleASN1Type = NewBerAny(nil)
-		tlvByteCount += e.singleASN1Type.decode(is, nil)
+		tlvByteCountD, err := e.singleASN1Type.decode(is, nil)
+		if err != nil {
+			return 0, err
+		}
+		tlvByteCount += tlvByteCountD
 		tlvByteCount += length.readEocIfIndefinite(is)
-		return tlvByteCount
+		return tlvByteCount, nil
 	}
 
 	if berTag.equals(128, 0, 1) {
 		e.octetAligned = NewBerOctetString(nil)
 		tlvByteCount += e.octetAligned.decode(is, false)
-		return tlvByteCount
+		return tlvByteCount, nil
 	}
 
 	if berTag.equals(128, 0, 2) {
 		e.arbitrary = NewBerBitString(nil, nil, 0)
 		tlvByteCount += e.arbitrary.decode(is, false)
-		return tlvByteCount
+		return tlvByteCount, nil
 	}
 
 	if tagWasPassed {
-		return 0
+		return 0, nil
 	}
 
-	throw("Error decoding WriteResponseCHOICE: tag " + berTag.toString() + " matched to no item.")
-	return 0
+	return 0, errors.New("Error decoding WriteResponseCHOICE: tag " + berTag.toString() + " matched to no item.")
 }
 func NewMyexternalEncoding() *MyexternalEncoding {
 	return &MyexternalEncoding{}

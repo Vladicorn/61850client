@@ -1,6 +1,9 @@
 package src
 
-import "bytes"
+import (
+	"bytes"
+	"errors"
+)
 
 type MMSpdu struct {
 	confirmedRequestPDU  *ConfirmedRequestPDU
@@ -17,7 +20,7 @@ type MMSpdu struct {
 func NewMMSpdu() *MMSpdu {
 	return &MMSpdu{}
 }
-func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
+func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) (int, error) {
 
 	codeLength := 0
 	if s.concludeRequestPDU != nil {
@@ -25,7 +28,7 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, PRIMITIVE, 11
 		reverseOS.writeByte(0x8B)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
 	if s.initiateErrorPDU != nil {
@@ -33,7 +36,7 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, CONSTRUCTED, 10
 		reverseOS.writeByte(0xAA)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
 	if s.initiateResponsePDU != nil {
@@ -41,7 +44,7 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, CONSTRUCTED, 9
 		reverseOS.writeByte(0xA9)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
 	if s.initiateRequestPDU != nil {
@@ -49,7 +52,7 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, CONSTRUCTED, 8
 		reverseOS.writeByte(0xA8)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
 	if s.rejectPDU != nil {
@@ -57,7 +60,7 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, CONSTRUCTED, 4
 		reverseOS.writeByte(0xA4)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
 	if s.unconfirmedPDU != nil {
@@ -65,7 +68,7 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, CONSTRUCTED, 3
 		reverseOS.writeByte(0xA3)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
 	if s.confirmedErrorPDU != nil {
@@ -73,7 +76,7 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, CONSTRUCTED, 2
 		reverseOS.writeByte(0xA2)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
 	if s.confirmedResponsePDU != nil {
@@ -81,7 +84,7 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, CONSTRUCTED, 1
 		reverseOS.writeByte(0xA1)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
 	if s.confirmedRequestPDU != nil {
@@ -89,11 +92,10 @@ func (s *MMSpdu) encode(reverseOS *ReverseByteArrayOutputStream) int {
 		// writeByte tag: CONTEXT_CLASS, CONSTRUCTED, 0
 		reverseOS.writeByte(0xA0)
 		codeLength += 1
-		return codeLength
+		return codeLength, nil
 	}
 
-	throw("Error encoding WriteResponseCHOICE: No element of WriteResponseCHOICE was selected.")
-	return -1
+	return -1, errors.New("Error encoding WriteResponseCHOICE: No element of WriteResponseCHOICE was selected.")
 }
 
 func (s *MMSpdu) decode(is *bytes.Buffer) int {

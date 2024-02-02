@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -44,7 +45,7 @@ func (a *RLRQApdu) encode(reverseOS *ReverseByteArrayOutputStream, withTag bool)
 
 	return codeLength
 }
-func (a *RLRQApdu) decode(is *bytes.Buffer, withTag bool) int {
+func (a *RLRQApdu) decode(is *bytes.Buffer, withTag bool) (int, error) {
 
 	tlByteCount := 0
 
@@ -61,7 +62,7 @@ func (a *RLRQApdu) decode(is *bytes.Buffer, withTag bool) int {
 
 	lengthVal := length.val
 	if lengthVal == 0 {
-		return tlByteCount
+		return tlByteCount, nil
 	}
 	vByteCount += berTag.decode(is)
 
@@ -69,16 +70,20 @@ func (a *RLRQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.reason = NewReleaseRequestReason()
 		vByteCount += a.reason.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	if berTag.equals(128, 32, 30) {
 		a.userInformation = NewAssociationInformation()
-		vByteCount += a.userInformation.decode(is, false)
+		vByteCountD, err := a.userInformation.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		vByteCount += vByteCountD
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -88,12 +93,10 @@ func (a *RLRQApdu) decode(is *bytes.Buffer, withTag bool) int {
 			throw("Decoded sequence has wrong end of contents octets")
 		}
 		vByteCount += readEocByte(is)
-		return tlByteCount + vByteCount
+		return tlByteCount + vByteCount, nil
 	}
 
-	throw(
-		"Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
-	return 0
+	return 0, errors.New("Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
 }
 
 func NewRLRQApdu() *RLRQApdu {

@@ -2,7 +2,7 @@ package src
 
 import (
 	"bytes"
-	"log"
+	"errors"
 	"strings"
 	"sync"
 )
@@ -22,11 +22,12 @@ func NewClientReceiver(maxMmsPduSize int, association *ClientAssociation) *Clien
 	return &ClientReceiver{maxMmsPduSize: maxMmsPduSize, closed: false, reportListener: association.reportListener, expectedResponseId: -1, association: association, pduBuffer: bytes.NewBuffer(make([]byte, maxMmsPduSize+400)),
 		lock: &sync.Mutex{}}
 }
-func (r *ClientReceiver) start() {
+func (r *ClientReceiver) start() error {
 	go r.run()
+	return nil
 }
 
-func (r *ClientReceiver) run() {
+func (r *ClientReceiver) run() error {
 	/*defer func() {
 		err := recover()
 		if err != nil {
@@ -49,7 +50,10 @@ func (r *ClientReceiver) run() {
 	for {
 		r.pduBuffer.Reset()
 		var buffer []byte
-		buffer = r.association.AcseAssociation.receive(r.pduBuffer)
+		buffer, err := r.association.AcseAssociation.receive(r.pduBuffer)
+		if err != nil {
+			return err
+		}
 		decodedResponsePdu := NewMMSpdu()
 		decodedResponsePdu.decode(bytes.NewBuffer(buffer))
 
@@ -60,7 +64,10 @@ func (r *ClientReceiver) run() {
 			} else {
 
 				if r.reportListener != nil {
-					report := r.processReport(decodedResponsePdu)
+					report, err := r.processReport(decodedResponsePdu)
+					if err != nil {
+						return err
+					}
 					go func() {
 						r.reportListener.newReport(report)
 					}()
@@ -108,10 +115,24 @@ func (r *ClientReceiver) run() {
 				if r.expectedResponseId == -1 {
 					// Discarding ConfirmedResponse MMS PDU because no listener for request was found.
 					return
+<<<<<<< Updated upstream
 				} else if decodedResponsePdu.confirmedResponsePDU.invokeID.value != r.expectedResponseId {
 					// Discarding ConfirmedResponse MMS PDU because no listener with fitting invokeID
 					// was
 					// found.
+=======
+				} else if decodedResponsePdu.confirmedResponsePDU != nil {
+					if decodedResponsePdu.confirmedResponsePDU.invokeID.value != r.expectedResponseId {
+						// Discarding ConfirmedResponse MMS PDU because no listener with fitting invokeID
+						// was
+						// found.
+						return
+					} else {
+						r.association.incomingResponses <- decodedResponsePdu
+					}
+				} else {
+					r.association.Close()
+>>>>>>> Stashed changes
 					return
 				} else {
 					r.association.incomingResponses <- decodedResponsePdu
@@ -144,28 +165,28 @@ func (r *ClientReceiver) close(err any) {
 
 }
 
-func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
+func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) (*Report, error) {
 	if mmsPdu.unconfirmedPDU == nil {
-		throw("getReport: Error decoding server response")
+		return nil, errors.New("getReport: Error decoding server response")
 	}
 
 	unconfirmedRes := mmsPdu.unconfirmedPDU
 
 	if unconfirmedRes.service == nil {
-		throw("getReport: Error decoding server response")
+		return nil, errors.New("getReport: Error decoding server response")
 	}
 
 	unconfirmedServ := unconfirmedRes.service
 
 	if unconfirmedServ.informationReport == nil {
-		throw("getReport: Error decoding server response")
+		return nil, errors.New("getReport: Error decoding server response")
 	}
 
 	listRes := unconfirmedServ.informationReport.listOfAccessResult.seqOf
 	index := 0
 
 	if listRes[index].success.visibleString == nil {
-		throw("processReport: report does not contain RptID")
+		return nil, errors.New("processReport: report does not contain RptID")
 	}
 
 	//RPTID - visible-string идентификатор отчета идентифицирует RCB, вызвавший создание отчета. Оно соответствует полю RptID RCB.
@@ -174,7 +195,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 	//OptFlds - bit-string равно полю OptFlds соответствующего RCB.
 	index++
 	if listRes[index].success.bitString == nil {
-		throw("processReport: report does not contain OptFlds")
+		return nil, errors.New("processReport: report does not contain OptFlds")
 	}
 	optFlds := NewBdaOptFlds(NewObjectReference("none"), "")
 
@@ -184,7 +205,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 	//index++
 	var sqNum *int = nil
 	if optFlds.isSequenceNumber() {
-		log.Println("isSequenceNumber")
+		//	log.Println("isSequenceNumber")
 		index++
 		sqNum = &listRes[index].success.unsigned.value
 	}
@@ -200,11 +221,11 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	// DatSet (необязательно, включается, если OptFlds.dataset-name имеет значение true) — ссылка на набор данных, данные которого отправляются в этом отчете.
 	dataSetRef := ""
-
 	if optFlds.isDataSetName() {
 		index++
 		dataSetRef = listRes[index].success.visibleString.toString()
 	} else {
+
 		urcbs := r.association.ServerModel.urcbs
 		for s := range urcbs {
 			urcb := urcbs[s]
@@ -213,24 +234,34 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 				break
 			}
 		}
+		brcbs := r.association.ServerModel.brcbs
+
+		for s := range brcbs {
+			brcb := brcbs[s]
+			//	log.Println(brcb.getRptId().getStringValue())
+			if brcb.getRptId() != nil && brcb.getRptId().getStringValue() == (rptId) || brcb.ObjectReference.toString() == (rptId) {
+				dataSetRef = brcb.getDatSet().getStringValue()
+
+				break
+			}
+		}
 	}
 
 	if dataSetRef == "" {
-		throw(
-			"unable to find RCB that matches the given RptID in the report.")
+		return nil, errors.New("unable to find RCB that matches the given RptID in the report")
+
 	}
 
 	dataSetRef = strings.ReplaceAll(dataSetRef, "$", ".")
 
 	dataSet := r.association.ServerModel.GetDataSet(dataSetRef)
 	if dataSet == nil {
-		throw(
-			"unable to find data set that matches the given data set reference of the report.")
+		return nil, errors.New("unable to find data set that matches the given data set reference of the report")
 	}
 
 	var bufOvfl *bool
 	if optFlds.isBufferOverflow() {
-		log.Println("bufOvfl")
+		//	log.Println("bufOvfl")
 		index++
 		//TODO
 		if listRes[index].success.bool != nil {
@@ -240,7 +271,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	var entryId *BdaOctetString = nil
 	if optFlds.isEntryId() {
-		log.Println("entityId")
+		//	log.Println("entityId")
 		entryId = NewBdaOctetString(NewObjectReference("none"), "", "", 8, false, false)
 		index++
 		entryId.setValue(listRes[index].success.octetString.value)
@@ -248,7 +279,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	var confRev *int = nil
 	if optFlds.isConfigRevision() {
-		log.Println("confRev")
+		//	log.Println("confRev")
 		index++
 		confRev = &listRes[index].success.unsigned.value
 	}
@@ -256,7 +287,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 	var subSqNum *int = nil
 	moreSegmentsFollow := false
 	if optFlds.isSegmentation() {
-		log.Println("subSqNum")
+		//	log.Println("subSqNum")
 		index++
 		subSqNum = &listRes[index].success.unsigned.value
 		index++
@@ -265,9 +296,14 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 
 	index++
 
+<<<<<<< Updated upstream
 	inclusionBitString := listRes[index].success.bitString.bitCheck()
+=======
+	//countBit := 223
+	countBit := len(listRes[index].success.bitString.value) * 7
+	inclusionBitString := listRes[index].success.bitString.bitCheck(countBit)
+>>>>>>> Stashed changes
 	numMembersReported := 0
-	//log.Println("inclusionBitString", listRes[index].success.bitString)
 	for _, bit := range inclusionBitString {
 		if bit {
 			numMembersReported++
@@ -283,25 +319,31 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 		/*for ind := 0; ind < len(inclusionBitString); ind++ {
 			index++
 			dataReference[ind] = strings.ReplaceAll(listRes[index].success.visibleString.toString(), "$", ".")
-		}
-
-		*/
+		}*/
 	}
 
 	reportedDataSetMembers := make([]FcModelNodeI, 0)
 	reportedDataSetMembersMap := make(map[string]FcModelNodeI)
 	//reportedDataSetMembers := make([]*FcModelNode, numMembersReported)
+<<<<<<< Updated upstream
 	dataSetIndex := 7
+=======
+	dataSetIndex := countBit
+	//dataSetIndex := 0
+>>>>>>> Stashed changes
 	index++
 
 	for _, dataSetMember := range dataSet.getMembers() {
 		if inclusionBitString[dataSetIndex] {
 			accessRes := listRes[index]
-			//log.Println("access ", accessRes.success.structure.seqOf)
 
 			//TPDO
 			//dataSetMemberCopy := dataSetMember.copy()
+<<<<<<< Updated upstream
 			log.Println(accessRes.success)
+=======
+
+>>>>>>> Stashed changes
 			dataSetMember.setValueFromMmsDataObj(accessRes.success)
 			reportedDataSetMembers = append(reportedDataSetMembers, dataSetMember.(FcModelNodeI))
 			reportedDataSetMembersMap[strings.ReplaceAll(listRes[index-numMembersReported].success.visibleString.toString(), "$", ".")] = dataSetMember.(FcModelNodeI)
@@ -347,7 +389,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) *Report {
 		reasonCodes,
 		dataReference,
 		reportedDataSetMembersMap,
-	)
+	), nil
 }
 
 func (r *ClientReceiver) removeExpectedResponse() *MMSpdu {

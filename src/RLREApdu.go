@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -12,7 +13,7 @@ type RLREApdu struct {
 	code            []byte
 }
 
-func (a *RLREApdu) decode(is *bytes.Buffer, withTag bool) int {
+func (a *RLREApdu) decode(is *bytes.Buffer, withTag bool) (int, error) {
 	tlByteCount := 0
 	vByteCount := 0
 	berTag := NewEmptyBerTag()
@@ -25,7 +26,7 @@ func (a *RLREApdu) decode(is *bytes.Buffer, withTag bool) int {
 	tlByteCount += length.decode(is)
 	lengthVal := length.val
 	if lengthVal == 0 {
-		return tlByteCount
+		return tlByteCount, nil
 	}
 	vByteCount += berTag.decode(is)
 
@@ -33,30 +34,33 @@ func (a *RLREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.reason = NewReleaseResponseReason()
 		vByteCount += a.reason.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	if berTag.equals(128, 32, 30) {
 		a.userInformation = NewAssociationInformation()
-		vByteCount += a.userInformation.decode(is, false)
+		vByteCountD, err := a.userInformation.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		vByteCount += vByteCountD
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	if lengthVal < 0 {
 		if !berTag.equals(0, 0, 0) {
-			throw("Decoded sequence has wrong end of contents octets")
+			return 0, errors.New("Decoded sequence has wrong end of contents octets")
 		}
 		vByteCount += readEocByte(is)
-		return tlByteCount + vByteCount
+		return tlByteCount + vByteCount, nil
 	}
 
-	throw("Unexpected end of sequence, length tag: ", strconv.Itoa(lengthVal), ", bytes decoded: ", strconv.Itoa(vByteCount))
-	return 0
+	return 0, errors.New("Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
 }
 func (a *RLREApdu) encode(reverseOS *ReverseByteArrayOutputStream, withTag bool) int {
 	if a.code != nil {

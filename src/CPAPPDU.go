@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -44,7 +45,7 @@ func (c *CPAPPDU) encode(reverseOS *ReverseByteArrayOutputStream, withTag bool) 
 	return codeLength
 }
 
-func (c *CPAPPDU) decode(is *bytes.Buffer) int {
+func (c *CPAPPDU) decode(is *bytes.Buffer) (int, error) {
 	tlByteCount := 0
 	vByteCount := 0
 	berTag := NewEmptyBerTag()
@@ -63,18 +64,22 @@ func (c *CPAPPDU) decode(is *bytes.Buffer) int {
 			vByteCount += c.modeSelector.decode(is, false)
 		} else if berTag.equals(128, 32, 2) {
 			c.normalModeParameters = NewCPAPPDUNormalModeParameters()
-			vByteCount += c.normalModeParameters.decode(is, false)
+			vByteCountD, err := c.normalModeParameters.decode(is, false)
+			if err != nil {
+				return 0, err
+			}
+			vByteCount += vByteCountD
 		} else if lengthVal < 0 && berTag.equals(0, 0, 0) {
 			vByteCount += readEocByte(is)
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		} else {
-			throw("tag does not match any set component: ", berTag.toString())
+			return 0, errors.New("tag does not match any set component: " + berTag.toString())
 		}
 	}
 	if vByteCount != lengthVal {
-		throw("Length of set does not match length tag, length tag: ", strconv.Itoa(lengthVal), ", actual set length: ", strconv.Itoa(vByteCount))
+		return 0, errors.New("Length of set does not match length tag, length tag: " + strconv.Itoa(lengthVal) + ", actual set length: " + strconv.Itoa(vByteCount))
 	}
-	return tlByteCount + vByteCount
+	return tlByteCount + vByteCount, nil
 }
 
 func NewCPAPPDU() *CPAPPDU {

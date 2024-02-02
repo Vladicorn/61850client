@@ -2,7 +2,6 @@ package src
 
 import (
 	"encoding/binary"
-	"log"
 	"math"
 )
 
@@ -15,11 +14,6 @@ func (l *ClientEventListener) associationClosed(err any) {
 }
 
 func (l *ClientEventListener) newReport(report *Report) {
-	/*log.Println("Отправляю")
-	l.Report <- report
-	log.Println("Отправил")
-
-	*/
 	values := make(map[string]MMSTelegram)
 	for dataRef, modelNode := range report.reportedDataSetMembersMap {
 		if modelNode.getMmsDataObj().structure != nil {
@@ -28,9 +22,7 @@ func (l *ClientEventListener) newReport(report *Report) {
 			l.getValue(modelNode.getMmsDataObj(), dataRef, values)
 		}
 	}
-	log.Println("Отправляю")
 	l.Values <- values
-	log.Println("Отправил")
 }
 
 func Float32frombytes(bytes []byte) float32 {
@@ -47,6 +39,7 @@ func (l *ClientEventListener) getValue(data *Data, dataRef string, values map[st
 		}
 		values[dataRef] = mmsTelegram
 	}
+
 	if data.integer != nil {
 		value := data.integer.value
 		mmsTelegram := MMSTelegram{
@@ -55,6 +48,7 @@ func (l *ClientEventListener) getValue(data *Data, dataRef string, values map[st
 		}
 		values[dataRef] = mmsTelegram
 	}
+
 	if data.utcTime != nil {
 		if len(data.utcTime.value) > 0 {
 			value := binary.BigEndian.Uint32(data.utcTime.value)
@@ -71,6 +65,7 @@ func (l *ClientEventListener) getValue(data *Data, dataRef string, values map[st
 		}
 		return
 	}
+
 	if data.bool != nil {
 		value := data.bool.value
 		mmsTelegram := MMSTelegram{
@@ -79,8 +74,17 @@ func (l *ClientEventListener) getValue(data *Data, dataRef string, values map[st
 		}
 		values[dataRef] = mmsTelegram
 	}
+
 	if data.bitString != nil {
-		//log.Println("BitString", data.bitString.value)
+		if mmsTelegram, ok := values[dataRef]; ok {
+			mmsTelegram.Quality = data.bitString.value
+			values[dataRef] = mmsTelegram
+		} else {
+			mmsTelegram := MMSTelegram{
+				Quality: data.bitString.value,
+			}
+			values[dataRef] = mmsTelegram
+		}
 		return
 	}
 }

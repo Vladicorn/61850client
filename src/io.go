@@ -21,12 +21,12 @@ func read(r *bufio.Reader) int {
 	return int(readByte)
 }
 
-func readByte(r *bufio.Reader) byte {
+func readByte(r *bufio.Reader) (byte, error) {
 	readByte, err := r.ReadByte()
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
-	return readByte
+	return readByte, nil
 }
 
 func writeByteByteShort(w *bufio.Writer, v int) {

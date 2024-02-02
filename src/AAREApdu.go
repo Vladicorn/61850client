@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -24,7 +25,7 @@ type AAREApdu struct {
 	implementationInformation        *ImplementationData
 }
 
-func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
+func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) (int, error) {
 	tlByteCount := 0
 	vByteCount := 0
 	berTag := NewEmptyBerTag()
@@ -51,7 +52,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += length.readEocIfIndefinite(is)
 		vByteCount += berTag.decode(is)
 	} else {
-		throw("tag does not match mandatory sequence component.")
+		return 0, errors.New("tag does not match mandatory sequence component")
 	}
 
 	if berTag.equals(128, 32, 2) {
@@ -61,7 +62,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += length.readEocIfIndefinite(is)
 		vByteCount += berTag.decode(is)
 	} else {
-		throw("tag does not match mandatory sequence component.")
+		return 0, errors.New("tag does not match mandatory sequence component")
 	}
 
 	if berTag.equals(128, 32, 3) {
@@ -70,11 +71,11 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.resultSourceDiagnostic.decode(is, nil)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	} else {
-		throw("tag does not match mandatory sequence component.")
+		return 0, errors.New("tag does not match mandatory sequence component")
 	}
 
 	if berTag.equals(128, 32, 4) {
@@ -83,7 +84,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.respondingAPTitle.decode(is, nil)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -94,7 +95,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.respondingAEQualifier.decode(is, nil)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -105,7 +106,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.respondingAPInvocationIdentifier.decode(is, true)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -116,7 +117,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.respondingAEInvocationIdentifier.decode(is, true)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -125,7 +126,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.responderAcseRequirements = NewACSERequirements()
 		vByteCount += a.responderAcseRequirements.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -134,7 +135,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.mechanismName = NewMechanismName()
 		vByteCount += a.mechanismName.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -142,10 +143,14 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 	if berTag.equals(128, 32, 10) {
 		vByteCount += length.decode(is)
 		a.respondingAuthenticationValue = NewAuthenticationValue()
-		vByteCount += a.respondingAuthenticationValue.decode(is, nil)
+		vByteCountD, err := a.respondingAuthenticationValue.decode(is, nil)
+		if err != nil {
+			return 0, err
+		}
+		vByteCount += vByteCountD
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -154,7 +159,7 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.applicationContextNameList = NewApplicationContextNameList()
 		vByteCount += a.applicationContextNameList.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -163,30 +168,33 @@ func (a *AAREApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.implementationInformation = NewImplementationData()
 		vByteCount += a.implementationInformation.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	if berTag.equals(128, 32, 30) {
 		a.userInformation = NewAssociationInformation()
-		vByteCount += a.userInformation.decode(is, false)
+		vByteCountD, err := a.userInformation.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		vByteCount += vByteCountD
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	if lengthVal < 0 {
 		if !berTag.equals(0, 0, 0) {
-			throw("Decoded sequence has wrong end of contents octets")
+			return 0, errors.New("Decoded sequence has wrong end of contents octets")
 		}
 		vByteCount += readEocByte(is)
-		return tlByteCount + vByteCount
+		return tlByteCount + vByteCount, nil
 	}
 
-	throw("Unexpected end of sequence, length tag: ", strconv.Itoa(lengthVal), ", bytes decoded: ", strconv.Itoa(vByteCount))
-	return 0
+	return 0, errors.New("Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
 }
 
 func (a *AAREApdu) encode(reverseOS *ReverseByteArrayOutputStream, withTag bool) int {

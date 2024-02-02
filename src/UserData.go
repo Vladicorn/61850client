@@ -1,6 +1,9 @@
 package src
 
-import "bytes"
+import (
+	"bytes"
+	"errors"
+)
 
 type UserData struct {
 	simplyEncodedData *SimplyEncodedData
@@ -33,7 +36,7 @@ func (t *UserData) encode(reverseOS *ReverseByteArrayOutputStream) int {
 	return -1
 }
 
-func (t *UserData) decode(is *bytes.Buffer, berTag *BerTag) int {
+func (t *UserData) decode(is *bytes.Buffer, berTag *BerTag) (int, error) {
 	tlvByteCount := 0
 	tagWasPassed := berTag != nil
 
@@ -45,21 +48,24 @@ func (t *UserData) decode(is *bytes.Buffer, berTag *BerTag) int {
 	if berTag.equals(64, 0, 0) {
 		t.simplyEncodedData = NewSimplyEncodedData()
 		tlvByteCount += t.simplyEncodedData.decode(is, false)
-		return tlvByteCount
+		return tlvByteCount, nil
 	}
 
 	if berTag.equals(64, 32, 1) {
 		t.fullyEncodedData = NewFullyEncodedData()
-		tlvByteCount += t.fullyEncodedData.decode(is, false)
-		return tlvByteCount
+		tlvByteCountD, err := t.fullyEncodedData.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		tlvByteCount += tlvByteCountD
+		return tlvByteCount, nil
 	}
 
 	if tagWasPassed {
-		return 0
+		return 0, nil
 	}
 
-	throw("Error decoding WriteResponseCHOICE: tag ", berTag.toString(), " matched to no item.")
-	return 0
+	return 0, errors.New("Error decoding WriteResponseCHOICE: tag " + berTag.toString() + " matched to no item.")
 }
 
 func NewUserData() *UserData {

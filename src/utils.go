@@ -10,7 +10,8 @@ const (
 )
 
 type MMSTelegram struct {
-	Type  MMSValueType
-	Value interface{}
-	Time  uint32
+	Type    MMSValueType
+	Value   interface{}
+	Time    uint32
+	Quality []byte
 }

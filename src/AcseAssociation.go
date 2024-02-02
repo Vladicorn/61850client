@@ -3,6 +3,7 @@ package src
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"strconv"
 )
 
@@ -28,7 +29,7 @@ func (a *AcseAssociation) disconnect() {
 	}
 }
 
-func (a *AcseAssociation) startAssociation(payload *bytes.Buffer, address string, port int, sSelRemote []byte, sSelLocal []byte, pSelRemote []byte, tSAP *ClientTSap, apTitleCalled []int, apTitleCalling []int, aeQualifierCalled int, aeQualifierCalling int) {
+func (a *AcseAssociation) startAssociation(payload *bytes.Buffer, address string, port int, sSelRemote []byte, sSelLocal []byte, pSelRemote []byte, tSAP *ClientTSap, apTitleCalled []int, apTitleCalling []int, aeQualifierCalled int, aeQualifierCalling int) error {
 	if a.Connected {
 		throw("io")
 	}
@@ -69,7 +70,10 @@ func (a *AcseAssociation) startAssociation(payload *bytes.Buffer, address string
 	acse := NewACSEApdu()
 	acse.aarq = aarq
 
-	reverseOStream := NewReverseByteArrayOutputStream(200)
+	reverseOStream, err := NewReverseByteArrayOutputStream(200)
+	if err != nil {
+		return err
+	}
 	acse.encode(reverseOStream)
 
 	userData := getPresentationUserDataField(reverseOStream.getArray())
@@ -97,7 +101,7 @@ func (a *AcseAssociation) startAssociation(payload *bytes.Buffer, address string
 	ssduOffsets = append(ssduOffsets, reverseOStream.index+1)
 	ssduLengths = append(ssduLengths, len(reverseOStream.buffer)-(reverseOStream.index+1))
 
-	res :=
+	res, err :=
 		a.startSConnection(
 			ssduList,
 			ssduOffsets,
@@ -107,8 +111,13 @@ func (a *AcseAssociation) startAssociation(payload *bytes.Buffer, address string
 			tSAP,
 			sSelRemote,
 			sSelLocal)
+	if err != nil {
+		return err
+	}
 
 	a.associateResponseAPDU = decodePConResponse(res)
+
+	return nil
 }
 
 func decodePConResponse(ppdu *bytes.Buffer) *bytes.Buffer {
@@ -123,9 +132,10 @@ func decodePConResponse(ppdu *bytes.Buffer) *bytes.Buffer {
 	return bytes.NewBuffer(acseApdu.aare.userInformation.seqOf[0].encoding.singleASN1Type.value)
 }
 
-func (a *AcseAssociation) startSConnection(ssduList [][]byte, ssduOffsets []int, ssduLengths []int, address string, port int, tSAP *ClientTSap, sSelRemote []byte, sSelLocal []byte) *bytes.Buffer {
+func (a *AcseAssociation) startSConnection(ssduList [][]byte, ssduOffsets []int, ssduLengths []int, address string, port int, tSAP *ClientTSap, sSelRemote []byte, sSelLocal []byte) (*bytes.Buffer, error) {
+	var err error
 	if a.Connected {
-		throw("io error")
+		return nil, errors.New("io error")
 	}
 
 	spduHeader := make([]byte, 24)
@@ -227,7 +237,10 @@ func (a *AcseAssociation) startSConnection(ssduList [][]byte, ssduOffsets []int,
 	ssduOffsets = append([]int{0}, ssduOffsets...)
 	ssduLengths = append([]int{len(spduHeader)}, ssduLengths...)
 
-	a.TConnection = tSAP.connectTo(address, port)
+	a.TConnection, err = tSAP.connectTo(address, port)
+	if err != nil {
+		return nil, err
+	}
 
 	a.TConnection.send(ssduList, ssduOffsets, ssduLengths)
 
@@ -239,7 +252,10 @@ func (a *AcseAssociation) startSConnection(ssduList [][]byte, ssduOffsets []int,
 			throw("ResponseTimeout waiting for connection response.")
 		}
 	}()
-	a.TConnection.receive(pduBuffer)
+	err = a.TConnection.receive(pduBuffer)
+	if err != nil {
+		return nil, err
+	}
 
 	// read ISO 8327-1 Header
 	// SPDU Type: ACCEPT (14)
@@ -355,7 +371,7 @@ parameterLoop:
 
 	a.Connected = true
 
-	return pduBuffer
+	return pduBuffer, nil
 }
 
 func (a *AcseAssociation) extractInteger(buffer *bytes.Buffer, size byte) int64 {
@@ -381,15 +397,18 @@ func (a *AcseAssociation) extractInteger(buffer *bytes.Buffer, size byte) int64 
 	return -1
 }
 
-func (a *AcseAssociation) receive(pduBuffer *bytes.Buffer) []byte {
+func (a *AcseAssociation) receive(pduBuffer *bytes.Buffer) ([]byte, error) {
 	if !a.Connected {
 		throw("ACSE Association not Connected")
 	}
-	a.TConnection.receive(pduBuffer)
+	err := a.TConnection.receive(pduBuffer)
+	if err != nil {
+		return nil, err
+	}
 
 	a.decodeSessionLayer(pduBuffer)
 
-	return a.decodePresentationLayer(pduBuffer)
+	return a.decodePresentationLayer(pduBuffer), nil
 }
 
 func (a *AcseAssociation) decodeSessionLayer(pduBuffer *bytes.Buffer) {
@@ -442,19 +461,23 @@ func (a *AcseAssociation) decodePresentationLayer(pduBuffer *bytes.Buffer) []byt
 	return userData.fullyEncodedData.seqOf[0].presentationDataValues.singleASN1Type.value
 }
 
-func (a *AcseAssociation) sendByteBuffer(payload *bytes.Buffer) {
+func (a *AcseAssociation) sendByteBuffer(payload *bytes.Buffer) error {
 	ssduList := make([][]byte, 0)
 	ssduOffsets := make([]int, 0)
 	ssduLengths := make([]int, 0)
 
-	ssduList, ssduOffsets, ssduLengths = a.encodePresentationLayer(payload, ssduList, ssduOffsets, ssduLengths)
+	ssduList, ssduOffsets, ssduLengths, err := a.encodePresentationLayer(payload, ssduList, ssduOffsets, ssduLengths)
+	if err != nil {
+		return err
+	}
 
 	ssduList, ssduOffsets, ssduLengths = a.encodeSessionLayer(ssduList, ssduOffsets, ssduLengths)
 
 	a.TConnection.send(ssduList, ssduOffsets, ssduLengths)
+	return nil
 }
 
-func (a *AcseAssociation) encodePresentationLayer(payload *bytes.Buffer, ssduList [][]byte, ssduOffsets []int, ssduLengths []int) ([][]byte, []int, []int) {
+func (a *AcseAssociation) encodePresentationLayer(payload *bytes.Buffer, ssduList [][]byte, ssduOffsets []int, ssduLengths []int) ([][]byte, []int, []int, error) {
 	pdv_list := NewPDVList()
 	pdv_list.presentationContextIdentifier = NewPresentationContextIdentifier(nil, 3)
 
@@ -471,13 +494,17 @@ func (a *AcseAssociation) encodePresentationLayer(payload *bytes.Buffer, ssduLis
 	user_data := NewUserData()
 	user_data.fullyEncodedData = (fully_encoded_data)
 
-	reverseOStream := NewReverseByteArrayOutputStream(200)
+	reverseOStream, err := NewReverseByteArrayOutputStream(200)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	user_data.encode(reverseOStream)
 
 	ssduList = append(ssduList, reverseOStream.buffer)
 	ssduOffsets = append(ssduOffsets, reverseOStream.index+1)
 	ssduLengths = append(ssduLengths, len(reverseOStream.buffer)-(reverseOStream.index+1))
-	return ssduList, ssduOffsets, ssduLengths
+	return ssduList, ssduOffsets, ssduLengths, nil
 }
 
 func (a *AcseAssociation) encodeSessionLayer(ssduList [][]byte, ssduOffsets []int, ssduLengths []int) ([][]byte, []int, []int) {

@@ -13,7 +13,7 @@ func (a *BerAny) encode(reverseOS *ReverseByteArrayOutputStream) int {
 	return len(a.value)
 }
 
-func (a *BerAny) decode(is *bytes.Buffer, tag *BerTag) int {
+func (a *BerAny) decode(is *bytes.Buffer, tag *BerTag) (int, error) {
 	decodedLength := 0
 	tagLength := 0
 	if tag == nil {
@@ -21,7 +21,11 @@ func (a *BerAny) decode(is *bytes.Buffer, tag *BerTag) int {
 		tagLength = tag.decode(is)
 		decodedLength += tagLength
 	} else {
-		tagLength = tag.encode(NewReverseByteArrayOutputStream(10))
+		n, err := NewReverseByteArrayOutputStream(10)
+		if err != nil {
+			return 0, err
+		}
+		tagLength = tag.encode(n)
 	}
 
 	lengthField := NewBerLength()
@@ -41,7 +45,7 @@ func (a *BerAny) decode(is *bytes.Buffer, tag *BerTag) int {
 	os := NewReverseByteArrayOutputStreamWithBufferAndIndex(a.value, tagLength+lengthLength-1)
 	encodeLength(os, lengthField.val)
 	tag.encode(os)
-	return decodedLength
+	return decodedLength, nil
 }
 
 func NewBerAny(value []byte) *BerAny {

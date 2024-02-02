@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -91,8 +92,8 @@ func (t *CPTypeNormalModeParameters) encode(reverseOS *ReverseByteArrayOutputStr
 	return codeLength
 }
 
-func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int {
-
+func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) (int, error) {
+	var err error
 	tlByteCount := 0
 	vByteCount := 0
 	numDecodedBytes := 0
@@ -107,7 +108,7 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 	tlByteCount += length.decode(is)
 	lengthVal := length.val
 	if lengthVal == 0 {
-		return tlByteCount
+		return tlByteCount, nil
 	}
 	vByteCount += berTag.decode(is)
 
@@ -115,7 +116,7 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 		t.protocolVersion = NewProtocolVersion()
 		vByteCount += t.protocolVersion.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -124,7 +125,7 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 		t.callingPresentationSelector = NewCallingPresentationSelector(nil)
 		vByteCount += t.callingPresentationSelector.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -133,7 +134,7 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 		t.calledPresentationSelector = NewCalledPresentationSelector(nil)
 		vByteCount += t.calledPresentationSelector.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -142,7 +143,7 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 		t.presentationContextDefinitionList = NewPresentationContextDefinitionList(nil)
 		vByteCount += t.presentationContextDefinitionList.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -151,7 +152,7 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 		t.defaultContextName = NewDefaultContextName()
 		vByteCount += t.defaultContextName.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -160,7 +161,7 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 		t.presentationRequirements = NewPresentationRequirements()
 		vByteCount += t.presentationRequirements.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -169,17 +170,20 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 		t.userSessionRequirements = NewUserSessionRequirements()
 		vByteCount += t.userSessionRequirements.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	t.userData = NewUserData()
-	numDecodedBytes = t.userData.decode(is, berTag)
+	numDecodedBytes, err = t.userData.decode(is, berTag)
+	if err != nil {
+		return 0, err
+	}
 	if numDecodedBytes != 0 {
 		vByteCount += numDecodedBytes
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	} else {
@@ -190,11 +194,10 @@ func (t *CPTypeNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int 
 			throw("Decoded sequence has wrong end of contents octets")
 		}
 		vByteCount += readEocByte(is)
-		return tlByteCount + vByteCount
+		return tlByteCount + vByteCount, nil
 	}
 
-	throw("Unexpected end of sequence, length tag: ", strconv.Itoa(lengthVal), ", bytes decoded: ", strconv.Itoa(vByteCount))
-	return 0
+	return 0, errors.New("Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
 }
 
 func NewCPTypeNormalModeParameters() *CPTypeNormalModeParameters {

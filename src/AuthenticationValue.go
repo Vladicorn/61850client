@@ -1,6 +1,9 @@
 package src
 
-import "bytes"
+import (
+	"bytes"
+	"errors"
+)
 
 type AuthenticationValue struct {
 	charstring *BerGraphicString
@@ -9,7 +12,7 @@ type AuthenticationValue struct {
 	code       []byte
 }
 
-func (v *AuthenticationValue) decode(is *bytes.Buffer, berTag *BerTag) int {
+func (v *AuthenticationValue) decode(is *bytes.Buffer, berTag *BerTag) (int, error) {
 
 	tlvByteCount := 0
 	tagWasPassed := berTag != nil
@@ -22,27 +25,30 @@ func (v *AuthenticationValue) decode(is *bytes.Buffer, berTag *BerTag) int {
 	if berTag.equals(128, 0, 0) {
 		v.charstring = NewBerGraphicString()
 		tlvByteCount += v.charstring.decode(is, false)
-		return tlvByteCount
+		return tlvByteCount, nil
 	}
 
 	if berTag.equals(128, 0, 1) {
 		v.bitstring = NewBerBitString(nil, nil, 0)
 		tlvByteCount += v.bitstring.decode(is, false)
-		return tlvByteCount
+		return tlvByteCount, nil
 	}
 
 	if berTag.equals(128, 32, 2) {
 		v.external = NewMyexternal2()
-		tlvByteCount += v.external.decode(is, false)
-		return tlvByteCount
+		tlvByteCountD, err := v.external.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		tlvByteCount += tlvByteCountD
+		return tlvByteCount, nil
 	}
 
 	if tagWasPassed {
-		return 0
+		return 0, nil
 	}
 
-	throw("Error decoding WriteResponseCHOICE: tag " + berTag.toString() + " matched to no item.")
-	return 0
+	return 0, errors.New("Error decoding WriteResponseCHOICE: tag " + berTag.toString() + " matched to no item.")
 }
 
 func (v *AuthenticationValue) encode(reverseOS *ReverseByteArrayOutputStream) int {

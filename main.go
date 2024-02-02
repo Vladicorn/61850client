@@ -1,18 +1,18 @@
 package main
 
 import (
-	"fmt"
 	"github.com/moxiaolong/61850client/src"
 	"log"
-	"time"
 )
-
-type myClient struct{}
 
 func main() {
 
+	variableBufReport := []string{"DemoMeasurement/LLN0.brcb1"}
+	variableUnBufReport := []string{"DemoMeasurement/LLN0.urcb1", "Bresler43LD1/LLN0.urcbH01", "D001CTRL/LLN0.urcbCTRL_C01", "ied1lDevice1/LLN0.urcb102"}
+	var err error
 	clientSap := src.NewClientSap()
 	event := src.NewClientEventListener()
+<<<<<<< Updated upstream
 	association := clientSap.Associate("192.168.0.67", 102, event)
 
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -40,30 +40,35 @@ func main() {
 
 	*/
 
+=======
+	association, err := clientSap.Associate("192.168.0.67", 102, event)
+>>>>>>> Stashed changes
 	if err != nil {
 		log.Println(err)
+		return
 	}
+
+	err = src.ConnectToBufferReport(association,
+		variableBufReport[0],
+		false)
+
+	err = src.ConnectToUnBufferReport(association,
+		variableUnBufReport[0],
+		false)
+
+	src.GetTree(association)
 
 	for {
 		select {
 		case report := <-event.Values:
 			log.Println(report)
-		case <-ticker.C:
-
-			//log.Println(event)
-			/*	err := readValue(association)
-				if err != nil {
-						log.Println(err)
-				}
-
-			*/
 		}
 	}
 
 }
 
 func getItems(association *src.ClientAssociation) {
-	serverModel := association.RetrieveModel()
+	serverModel, _ := association.RetrieveModel()
 	for num, items := range serverModel.Children {
 		//	log.Println(num)
 		lg, ok := items.(*src.LogicalDevice)
@@ -110,6 +115,7 @@ func getItems(association *src.ClientAssociation) {
 		}
 	}
 }
+
 func readDataSet(association *src.ClientAssociation) error {
 	//serverModel := association.RetrieveModel()
 
@@ -143,6 +149,7 @@ func readDataSet(association *src.ClientAssociation) error {
 	return nil
 }
 
+<<<<<<< Updated upstream
 /*
 func report(association *src.ClientAssociation) {
 	log.Println("sets")
@@ -265,8 +272,10 @@ func subscribeOnDataset(association *src.ClientAssociation, dataset string, repo
 	return nil
 }
 
+=======
+>>>>>>> Stashed changes
 func readValue(association *src.ClientAssociation) error {
-	serverModel := association.RetrieveModel()
+	serverModel, _ := association.RetrieveModel()
 
 	ttt := serverModel.DataSets
 	log.Println(ttt)

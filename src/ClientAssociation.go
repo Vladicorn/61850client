@@ -2,8 +2,7 @@ package src
 
 import "C"
 import (
-	"fmt"
-	"log"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,8 +28,9 @@ type ClientAssociation struct {
 
 func NewClientAssociation(address string, port int, acseSap *ClientAcseSap, proposedMaxPduSize int,
 	proposedMaxServOutstandingCalling int, proposedMaxServOutstandingCalled int, proposedDataStructureNestingLevel int,
-	servicesSupportedCalling []byte, responseTimeout int, messageFragmentTimeout int, reportListener *ClientEventListener) *ClientAssociation {
+	servicesSupportedCalling []byte, responseTimeout int, messageFragmentTimeout int, reportListener *ClientEventListener) (*ClientAssociation, error) {
 
+	var err error
 	c := &ClientAssociation{}
 	c.lock = &sync.Mutex{}
 	c.incomingResponses = make(chan *MMSpdu)
@@ -41,7 +41,10 @@ func NewClientAssociation(address string, port int, acseSap *ClientAcseSap, prop
 	acseSap.tSap.MessageTimeout = responseTimeout
 	c.negotiatedMaxPduSize = proposedMaxPduSize
 	c.reportListener = reportListener
-	c.reverseOStream = NewReverseByteArrayOutputStream(500)
+	c.reverseOStream, err = NewReverseByteArrayOutputStream(500)
+	if err != nil {
+		return nil, err
+	}
 
 	initiateRequestMMSpdu :=
 		constructInitRequestPdu(
@@ -51,14 +54,23 @@ func NewClientAssociation(address string, port int, acseSap *ClientAcseSap, prop
 			proposedDataStructureNestingLevel,
 			servicesSupportedCalling)
 
-	reverseOStream := NewReverseByteArrayOutputStream(500)
-	initiateRequestMMSpdu.encode(reverseOStream)
+	reverseOStream, err := NewReverseByteArrayOutputStream(500)
+	if err != nil {
+		return nil, err
+	}
+	_, err = initiateRequestMMSpdu.encode(reverseOStream)
+	if err != nil {
+		return nil, err
+	}
 
-	c.AcseAssociation =
+	c.AcseAssociation, err =
 		acseSap.associate(
 			address,
 			port,
 			reverseOStream.getByteBuffer())
+	if err != nil {
+		return nil, err
+	}
 
 	initResponse := c.AcseAssociation.getAssociateResponseAPdu()
 
@@ -66,27 +78,33 @@ func NewClientAssociation(address string, port int, acseSap *ClientAcseSap, prop
 
 	initiateResponseMmsPdu.decode(initResponse)
 
-	c.handleInitiateResponse(
+	err = c.handleInitiateResponse(
 		initiateResponseMmsPdu,
 		proposedMaxPduSize,
 		proposedMaxServOutstandingCalling,
 		proposedMaxServOutstandingCalled,
 		proposedDataStructureNestingLevel)
+	if err != nil {
+		return nil, err
+	}
 
 	c.AcseAssociation.MessageTimeout = 0
 	c.clientReceiver = NewClientReceiver(c.negotiatedMaxPduSize, c)
-	c.clientReceiver.start()
-	return c
+	err = c.clientReceiver.start()
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
-func (c *ClientAssociation) handleInitiateResponse(responsePdu *MMSpdu, proposedMaxPduSize int, proposedMaxServOutstandingCalling int, proposedMaxServOutstandingCalled int, proposedDataStructureNestingLevel int) {
+func (c *ClientAssociation) handleInitiateResponse(responsePdu *MMSpdu, proposedMaxPduSize int, proposedMaxServOutstandingCalling int, proposedMaxServOutstandingCalled int, proposedDataStructureNestingLevel int) error {
 	if responsePdu.initiateErrorPDU != nil {
-		throw("Got response error of class: ") //responsePdu.initiateErrorPDU.errorClass) TODO
+		return errors.New("got response error of class: ") //responsePdu.initiateErrorPDU.errorClass) TODO
 	}
 
 	if responsePdu.initiateResponsePDU == nil {
 		c.AcseAssociation.disconnect()
-		throw("Error decoding InitiateResponse Pdu")
+		return errors.New("error decoding InitiateResponse Pdu")
 	}
 
 	initiateResponsePDU := responsePdu.initiateResponsePDU
@@ -112,19 +130,20 @@ func (c *ClientAssociation) handleInitiateResponse(responsePdu *MMSpdu, proposed
 	if c.negotiatedMaxPduSize < 64 || c.negotiatedMaxPduSize > proposedMaxPduSize || negotiatedMaxServOutstandingCalling > proposedMaxServOutstandingCalling || negotiatedMaxServOutstandingCalling < 0 || negotiatedMaxServOutstandingCalled > proposedMaxServOutstandingCalled || negotiatedMaxServOutstandingCalled < 0 || negotiatedDataStructureNestingLevel > proposedDataStructureNestingLevel || negotiatedDataStructureNestingLevel < 0 {
 
 		c.AcseAssociation.disconnect()
-		throw("Error negotiating parameters")
+		return errors.New("error negotiating parameters")
 	}
 
 	version :=
 		initiateResponsePDU.initResponseDetail.negotiatedVersionNumber.intValue()
 	if version != 1 {
-		throw("Unsupported version number was negotiated.")
+		return errors.New("unsupported version number was negotiated")
 	}
 
 	c.servicesSupported = initiateResponsePDU.initResponseDetail.servicesSupportedCalled.value
 	if (c.servicesSupported[0] & 0x40) != 0x40 {
-		throw("Obligatory services are not supported by the server.")
+		return errors.New("obligatory services are not supported by the server")
 	}
+	return nil
 }
 
 func (c *ClientAssociation) Close() {
@@ -142,12 +161,19 @@ func (c *ClientAssociation) Close() {
 
 }
 
-func (c *ClientAssociation) RetrieveModel() *ServerModel {
-	ldNames := c.retrieveLogicalDevices()
+func (c *ClientAssociation) RetrieveModel() (*ServerModel, error) {
+	ldNames, err := c.retrieveLogicalDevices()
+	if err != nil {
+		return nil, err
+	}
 	lnNames := make([][]string, 0)
 
 	for i := 0; i < len(ldNames); i++ {
-		lnNames = append(lnNames, c.retrieveLogicalNodeNames(ldNames[i]))
+		lng, err := c.retrieveLogicalNodeNames(ldNames[i])
+		if err != nil {
+			return nil, err
+		}
+		lnNames = append(lnNames, lng)
 	}
 	lds := make([]*LogicalDevice, 0)
 	for i := 0; i < len(ldNames); i++ {
@@ -162,21 +188,24 @@ func (c *ClientAssociation) RetrieveModel() *ServerModel {
 
 	c.ServerModel = NewServerModel(lds, nil)
 
-	c.updateDataSets()
+	err = c.updateDataSets()
+	if err != nil {
+		return nil, err
+	}
 
-	return c.ServerModel
+	return c.ServerModel, nil
 
 }
 
-func (c *ClientAssociation) retrieveLogicalDevices() []string {
+func (c *ClientAssociation) retrieveLogicalDevices() ([]string, error) {
 	serviceRequest := c.constructGetServerDirectoryRequest()
 	confirmedServiceResponse := c.encodeWriteReadDecode(serviceRequest)
 	return c.decodeGetServerDirectoryResponse(confirmedServiceResponse)
 }
 
-func (c *ClientAssociation) updateDataSets() {
+func (c *ClientAssociation) updateDataSets() error {
 	if c.ServerModel == nil {
-		throw("Before calling this function you have to get the ServerModel using the retrieveModel() function")
+		return errors.New("before calling this function you have to get the ServerModel using the retrieveModel() function")
 	}
 	lds := c.ServerModel.Children
 	for _, ld := range lds {
@@ -184,14 +213,19 @@ func (c *ClientAssociation) updateDataSets() {
 			c.constructGetDirectoryRequest(ld.getObjectReference().getName(), "", false)
 		confirmedServiceResponse := c.encodeWriteReadDecode(serviceRequest)
 
-		c.decodeAndRetrieveDsNamesAndDefinitions(confirmedServiceResponse, ld.(*LogicalDevice))
-	}
+		err := c.decodeAndRetrieveDsNamesAndDefinitions(confirmedServiceResponse, ld.(*LogicalDevice))
+		if err != nil {
+			return err
+		}
 
+	}
+	return nil
 }
 
 func (c *ClientAssociation) retrieveDataDefinitions(lnRef *ObjectReference) *LogicalNode {
 	serviceRequest := c.constructGetDataDefinitionRequest(lnRef)
 	confirmedServiceResponse := c.encodeWriteReadDecode(serviceRequest)
+
 	return decodeGetDataDefinitionResponse(confirmedServiceResponse, lnRef)
 }
 
@@ -200,6 +234,9 @@ func decodeGetDataDefinitionResponse(confirmedServiceResponse *ConfirmedServiceR
 }
 
 func (c *ClientAssociation) encodeWriteReadDecode(serviceRequest *ConfirmedServiceRequest) *ConfirmedServiceResponse {
+	if c == nil {
+		return nil
+	}
 	currentInvokeId := c.getInvokeId()
 
 	confirmedRequestPdu := NewConfirmedRequestPDU()
@@ -212,38 +249,17 @@ func (c *ClientAssociation) encodeWriteReadDecode(serviceRequest *ConfirmedServi
 	c.reverseOStream.reset()
 
 	func() {
-		defer func() {
-			r := recover()
-			if r != nil {
-				c.clientReceiver.close(r)
-				panic(r)
-			}
-		}()
 		requestPdu.encode(c.reverseOStream)
 	}()
 
 	c.clientReceiver.expectedResponseId = currentInvokeId
 
-	func() {
-		defer func() {
-			r := recover()
-			if r != nil {
-				go c.clientReceiver.close(r)
-				throw("Error sending packet." + fmt.Sprintf("%+v", r))
-			}
-		}()
-		c.AcseAssociation.sendByteBuffer(c.reverseOStream.getByteBuffer())
-	}()
+	c.AcseAssociation.sendByteBuffer(c.reverseOStream.getByteBuffer())
 
 	var decodedResponsePdu *MMSpdu = nil
 
 	func() {
-		defer func() {
-			r := recover()
-			if r != nil {
 
-			}
-		}()
 		if c.responseTimeout == 0 {
 			if len(c.incomingResponses) > 0 {
 				decodedResponsePdu = <-c.incomingResponses
@@ -253,7 +269,6 @@ func (c *ClientAssociation) encodeWriteReadDecode(serviceRequest *ConfirmedServi
 			timeOut := time.After(time.Duration(c.responseTimeout) * time.Millisecond)
 			select {
 			case decodedResponsePdu = <-c.incomingResponses:
-				log.Println(decodedResponsePdu.rejectPDU.tag)
 				break
 			case <-timeOut:
 				panic("time out")
@@ -397,18 +412,22 @@ func testForInitiateErrorResponse(mmsResponsePdu *MMSpdu) {
 	}
 }
 
-func (c *ClientAssociation) retrieveLogicalNodeNames(ld string) []string {
+func (c *ClientAssociation) retrieveLogicalNodeNames(ld string) ([]string, error) {
 	lns := make([]string, 0)
+	var err error
 	continueAfterRef := ""
 	once := false
 	for !once || continueAfterRef != "" {
 		once = true
 		serviceRequest := c.constructGetDirectoryRequest(ld, continueAfterRef, true)
 		confirmedServiceResponse := c.encodeWriteReadDecode(serviceRequest)
-		continueAfterRef, lns = c.decodeGetDirectoryResponse(confirmedServiceResponse, lns)
+		continueAfterRef, lns, err = c.decodeGetDirectoryResponse(confirmedServiceResponse, lns)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return lns
+	return lns, nil
 }
 
 func (c *ClientAssociation) constructGetServerDirectoryRequest() *ConfirmedServiceRequest {
@@ -428,20 +447,22 @@ func (c *ClientAssociation) constructGetServerDirectoryRequest() *ConfirmedServi
 	return confirmedServiceRequest
 }
 
-func (c *ClientAssociation) decodeGetServerDirectoryResponse(confirmedServiceResponse *ConfirmedServiceResponse) []string {
+func (c *ClientAssociation) decodeGetServerDirectoryResponse(confirmedServiceResponse *ConfirmedServiceResponse) ([]string, error) {
+	objectRefs := make([]string, 0) // ObjectReference[identifiers.size()];
+	if confirmedServiceResponse == nil {
+		return objectRefs, errors.New("confirmedServiceResponse is nil")
+	}
 	if confirmedServiceResponse.getNameList == nil {
-		throw(
-			"FAILED_DUE_TO_COMMUNICATIONS_CONSTRAINTError decoding Get Server Directory Response Pdu")
+		return objectRefs, errors.New("FAILED_DUE_TO_COMMUNICATIONS_CONSTRAINTError decoding Get Server Directory Response Pdu")
 	}
 
 	identifiers := confirmedServiceResponse.getNameList.listOfIdentifier.getIdentifier()
-	objectRefs := make([]string, 0) // ObjectReference[identifiers.size()];
 
 	for _, identifier := range identifiers {
 		objectRefs = append(objectRefs, identifier.toString())
 	}
 
-	return objectRefs
+	return objectRefs, nil
 }
 
 func (c *ClientAssociation) constructGetDirectoryRequest(ldRef string, continueAfter string, logicalDevice bool) *ConfirmedServiceRequest {
@@ -471,10 +492,9 @@ func (c *ClientAssociation) constructGetDirectoryRequest(ldRef string, continueA
 	return confirmedServiceRequest
 }
 
-func (c *ClientAssociation) decodeAndRetrieveDsNamesAndDefinitions(confirmedServiceResponse *ConfirmedServiceResponse, ld *LogicalDevice) {
+func (c *ClientAssociation) decodeAndRetrieveDsNamesAndDefinitions(confirmedServiceResponse *ConfirmedServiceResponse, ld *LogicalDevice) error {
 	if confirmedServiceResponse.getNameList == nil {
-		throw(
-			" ServiceError decodeGetDataSetResponse: Error decoding server response")
+		return errors.New("serviceError decodeGetDataSetResponse: Error decoding server response")
 	}
 
 	getNameListResponse := confirmedServiceResponse.getNameList
@@ -482,7 +502,7 @@ func (c *ClientAssociation) decodeAndRetrieveDsNamesAndDefinitions(confirmedServ
 	identifiers := getNameListResponse.listOfIdentifier.getIdentifier()
 
 	if len(identifiers) == 0 {
-		return
+		return nil
 	}
 
 	for _, identifier := range identifiers {
@@ -491,8 +511,9 @@ func (c *ClientAssociation) decodeAndRetrieveDsNamesAndDefinitions(confirmedServ
 	}
 
 	if getNameListResponse.moreFollows != nil && getNameListResponse.moreFollows.value == true {
-		throw("FAILED_DUE_TO_COMMUNICATIONS_CONSTRAINT")
+		return errors.New("FAILED_DUE_TO_COMMUNICATIONS_CONSTRAINT")
 	}
+	return nil
 }
 
 func (c *ClientAssociation) constructGetDataDefinitionRequest(lnRef *ObjectReference) *ConfirmedServiceRequest {
@@ -517,10 +538,9 @@ func (c *ClientAssociation) getInvokeId() int {
 	return c.invokeId
 }
 
-func (c *ClientAssociation) decodeGetDirectoryResponse(confirmedServiceResponse *ConfirmedServiceResponse, lns []string) (string, []string) {
+func (c *ClientAssociation) decodeGetDirectoryResponse(confirmedServiceResponse *ConfirmedServiceResponse, lns []string) (string, []string, error) {
 	if confirmedServiceResponse.getNameList == nil {
-		throw(
-			"FAILED_DUE_TO_COMMUNICATIONS_CONSTRAINT decodeGetLDDirectoryResponse: Error decoding server response")
+		return "", lns, errors.New("FAILED_DUE_TO_COMMUNICATIONS_CONSTRAINT decodeGetLDDirectoryResponse: Error decoding server response")
 	}
 
 	getNameListResponse := confirmedServiceResponse.getNameList
@@ -528,8 +548,7 @@ func (c *ClientAssociation) decodeGetDirectoryResponse(confirmedServiceResponse 
 	identifiers := getNameListResponse.listOfIdentifier.getIdentifier()
 
 	if len(identifiers) == 0 {
-		throw(
-			"INSTANCE_NOT_AVAILABLE decodeGetLDDirectoryResponse: Instance not available")
+		return "", lns, errors.New("INSTANCE_NOT_AVAILABLE decodeGetLDDirectoryResponse: Instance not available")
 	}
 
 	var identifier *Identifier = nil
@@ -543,9 +562,9 @@ func (c *ClientAssociation) decodeGetDirectoryResponse(confirmedServiceResponse 
 	}
 
 	if getNameListResponse.moreFollows != nil && getNameListResponse.moreFollows.value == false {
-		return "", lns
+		return "", lns, nil
 	} else {
-		return identifier.toString(), lns
+		return identifier.toString(), lns, nil
 	}
 }
 
@@ -598,10 +617,7 @@ func (c *ClientAssociation) decodeGetDataSetDirectoryResponse(confirmedServiceRe
 		// be ignored and DataSet cotaining elements with these FCs are
 		// ignored and not created.
 		func() {
-			defer func() {
-				//r := recover()
-				return
-			}()
+
 			member = c.ServerModel.getNodeFromVariableDef(variableDef).(FcModelNodeI)
 		}()
 
@@ -684,10 +700,14 @@ func (c *ClientAssociation) constructVariableAccessSpecification(modelNode FcMod
 	return variableAccessSpecification
 }
 
-func (c *ClientAssociation) SetDataValues(node FcModelNodeI) {
+func (c *ClientAssociation) SetDataValues(node FcModelNodeI) error {
 	serviceRequest := c.constructSetDataValuesRequest(node)
 	confirmedServiceResponse := c.encodeWriteReadDecode(serviceRequest)
-	c.decodeSetDataValuesResponse(confirmedServiceResponse)
+	err := c.decodeSetDataValuesResponse(confirmedServiceResponse)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // return error string
@@ -720,18 +740,20 @@ func (c *ClientAssociation) constructSetDataValuesRequest(modelNode FcModelNodeI
 	return confirmedServiceRequest
 }
 
-func (c *ClientAssociation) decodeSetDataValuesResponse(confirmedServiceResponse *ConfirmedServiceResponse) {
+func (c *ClientAssociation) decodeSetDataValuesResponse(confirmedServiceResponse *ConfirmedServiceResponse) error {
 	writeResponse := confirmedServiceResponse.write
 
 	if writeResponse == nil {
-		throw("FAILED_DUE_TO_COMMUNICATIONS_CONSTRAINT SetDataValuesResponse: improper response")
+		return errors.New("FAILED_DUE_TO_COMMUNICATIONS_CONSTRAINT SetDataValuesResponse: improper response")
 	}
 
 	subChoice := writeResponse.seqOf[0]
 
 	if subChoice.failure != nil {
-		throw("mmsDataAccessErrorToServiceError" + strconv.Itoa(subChoice.failure.intValue()))
+		return errors.New("mmsDataAccessErrorToServiceError" + strconv.Itoa(subChoice.failure.intValue()))
 	}
+
+	return nil
 }
 
 func (c *ClientAssociation) constructSetDataSetValues(dataSet *DataSet) *ConfirmedServiceRequest {

@@ -1,6 +1,8 @@
 package src
 
-import "strconv"
+import (
+	"strconv"
+)
 
 type BdaInt32 struct {
 	BasicDataAttribute

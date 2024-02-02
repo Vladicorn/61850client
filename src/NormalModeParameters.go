@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -16,7 +17,8 @@ type CPAPPDUNormalModeParameters struct {
 	code                                    []byte
 }
 
-func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int {
+func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) (int, error) {
+	var err error
 	tlByteCount := 0
 	vByteCount := 0
 	numDecodedBytes := 0
@@ -31,7 +33,7 @@ func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int
 
 	lengthVal := length.val
 	if lengthVal == 0 {
-		return tlByteCount
+		return tlByteCount, nil
 	}
 	vByteCount += berTag.decode(is)
 
@@ -39,7 +41,7 @@ func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int
 		p.protocolVersion = NewProtocolVersion()
 		vByteCount += p.protocolVersion.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -48,7 +50,7 @@ func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int
 		p.respondingPresentationSelector = NewRespondingPresentationSelector(nil)
 		vByteCount += p.respondingPresentationSelector.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -57,7 +59,7 @@ func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int
 		p.presentationContextDefinitionResultList = NewPresentationContextDefinitionResultList()
 		vByteCount += p.presentationContextDefinitionResultList.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -66,7 +68,7 @@ func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int
 		p.presentationRequirements = NewPresentationRequirements()
 		vByteCount += p.presentationRequirements.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -75,17 +77,20 @@ func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int
 		p.userSessionRequirements = NewUserSessionRequirements()
 		vByteCount += p.userSessionRequirements.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	p.userData = NewUserData()
-	numDecodedBytes = p.userData.decode(is, berTag)
+	numDecodedBytes, err = p.userData.decode(is, berTag)
+	if err != nil {
+		return 0, err
+	}
 	if numDecodedBytes != 0 {
 		vByteCount += numDecodedBytes
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	} else {
@@ -93,15 +98,13 @@ func (p *CPAPPDUNormalModeParameters) decode(is *bytes.Buffer, withTag bool) int
 	}
 	if lengthVal < 0 {
 		if !berTag.equals(0, 0, 0) {
-			throw("Decoded sequence has wrong end of contents octets")
+			return 0, errors.New("Decoded sequence has wrong end of contents octets")
 		}
 		vByteCount += readEocByte(is)
-		return tlByteCount + vByteCount
+		return tlByteCount + vByteCount, nil
 	}
 
-	throw(
-		"Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
-	return 0
+	return 0, errors.New("Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
 }
 
 func (p *CPAPPDUNormalModeParameters) encode(reverseOS *ReverseByteArrayOutputStream, withTag bool) int {

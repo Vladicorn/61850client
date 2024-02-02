@@ -2,6 +2,8 @@ package src
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -36,7 +38,8 @@ func (l *PDVList) encode(reverseOS *ReverseByteArrayOutputStream, withTag bool) 
 	return codeLength
 }
 
-func (l *PDVList) decode(is *bytes.Buffer, withTag bool) int {
+func (l *PDVList) decode(is *bytes.Buffer, withTag bool) (int, error) {
+	var err error
 	tlByteCount := 0
 	vByteCount := 0
 	numDecodedBytes := 0
@@ -62,30 +65,32 @@ func (l *PDVList) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += l.presentationContextIdentifier.decode(is, false)
 		vByteCount += berTag.decode(is)
 	} else {
-		throw("tag does not match mandatory sequence component.")
+		return -1, errors.New("tag does not match mandatory sequence component.")
 	}
 
 	l.presentationDataValues = NewPresentationDataValues()
-	numDecodedBytes = l.presentationDataValues.decode(is, berTag)
+	numDecodedBytes, err = l.presentationDataValues.decode(is, berTag)
+	if err != nil {
+		return -1, err
+	}
 	if numDecodedBytes != 0 {
 		vByteCount += numDecodedBytes
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	} else {
-		throw("tag does not match mandatory sequence component.")
+		return -1, errors.New("tag does not match mandatory sequence component.")
 	}
 	if lengthVal < 0 {
 		if !berTag.equals(0, 0, 0) {
 			throw("Decoded sequence has wrong end of contents octets")
 		}
 		vByteCount += readEocByte(is)
-		return tlByteCount + vByteCount
+		return tlByteCount + vByteCount, nil
 	}
 
-	throw("Unexpected end of sequence, length tag: ", strconv.Itoa(lengthVal), ", bytes decoded: ", strconv.Itoa(vByteCount))
-	return -1
+	return -1, errors.New(fmt.Sprintf("Unexpected end of sequence, length tag: ", strconv.Itoa(lengthVal), ", bytes decoded: ", strconv.Itoa(vByteCount)))
 }
 
 func NewPDVList() *PDVList {

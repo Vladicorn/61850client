@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 )
 
 type ReverseByteArrayOutputStream struct {
@@ -26,14 +27,14 @@ func (s *ReverseByteArrayOutputStream) reset() {
 	s.index = len(s.buffer) - 1
 }
 
-func NewReverseByteArrayOutputStream(bufferSize int) *ReverseByteArrayOutputStream {
+func NewReverseByteArrayOutputStream(bufferSize int) (*ReverseByteArrayOutputStream, error) {
 	if bufferSize <= 0 {
-		throw("buffer size may not be <= 0")
+		return nil, errors.New("buffer size may not be <= 0")
 	}
 	r := &ReverseByteArrayOutputStream{}
 	r.buffer = make([]byte, bufferSize)
 	r.index = bufferSize - 1
-	return r
+	return r, nil
 }
 func NewReverseByteArrayOutputStreamWithBufferAndIndex(buffer []byte, startingIndex int) *ReverseByteArrayOutputStream {
 	if len(buffer) <= 0 {

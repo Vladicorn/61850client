@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -12,7 +13,7 @@ type CPType struct {
 	code                 []byte
 }
 
-func (t *CPType) decode(is *bytes.Buffer, withTag bool) int {
+func (t *CPType) decode(is *bytes.Buffer, withTag bool) (int, error) {
 	tlByteCount := 0
 	vByteCount := 0
 	berTag := NewEmptyBerTag()
@@ -32,18 +33,23 @@ func (t *CPType) decode(is *bytes.Buffer, withTag bool) int {
 			vByteCount += t.modeSelector.decode(is, false)
 		} else if berTag.equals(128, 32, 2) {
 			t.normalModeParameters = NewCPTypeNormalModeParameters()
-			vByteCount += t.normalModeParameters.decode(is, false)
+			vByteCountD, err := t.normalModeParameters.decode(is, false)
+			if err != nil {
+				return 0, err
+			}
+			vByteCount += vByteCountD
 		} else if lengthVal < 0 && berTag.equals(0, 0, 0) {
 			vByteCount += readEocByte(is)
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		} else {
 			throw("tag does not match any set component: " + berTag.toString())
 		}
 	}
 	if vByteCount != lengthVal {
-		throw("Length of set does not match length tag, length tag: ", strconv.Itoa(lengthVal), ", actual set length: ", strconv.Itoa(vByteCount))
+		return 0, errors.New("Length of set does not match length tag, length tag: " + strconv.Itoa(lengthVal) + ", actual set length: " + strconv.Itoa(vByteCount))
+
 	}
-	return tlByteCount + vByteCount
+	return tlByteCount + vByteCount, nil
 }
 
 func (t *CPType) encode(reverseOS *ReverseByteArrayOutputStream, withTag bool) int {

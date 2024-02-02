@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -34,7 +35,7 @@ func (a *AssociationInformation) encode(reverseOS *ReverseByteArrayOutputStream,
 	return codeLength
 }
 
-func (a *AssociationInformation) decode(is *bytes.Buffer, withTag bool) int {
+func (a *AssociationInformation) decode(is *bytes.Buffer, withTag bool) (int, error) {
 	tlByteCount := 0
 	vByteCount := 0
 	berTag := NewEmptyBerTag()
@@ -55,16 +56,20 @@ func (a *AssociationInformation) decode(is *bytes.Buffer, withTag bool) int {
 		}
 
 		if !berTag.equals(0, 32, 8) {
-			throw("tag does not match mandatory sequence of/set of component.")
+			return 0, errors.New("tag does not match mandatory sequence of/set of component.")
 		}
 		element := NewMyexternal()
-		vByteCount += element.decode(is, false)
+		vByteCountD, err := element.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		vByteCount += vByteCountD
 		a.seqOf = append(a.seqOf, element)
 	}
 	if lengthVal >= 0 && vByteCount != lengthVal {
-		throw("Decoded SequenceOf or SetOf has wrong length. Expected ", strconv.Itoa(lengthVal), " but has ", strconv.Itoa(vByteCount))
+		return 0, errors.New("Decoded SequenceOf or SetOf has wrong length. Expected " + strconv.Itoa(lengthVal) + " but has " + strconv.Itoa(vByteCount))
 	}
-	return tlByteCount + vByteCount
+	return tlByteCount + vByteCount, nil
 }
 
 func NewAssociationInformation() *AssociationInformation {

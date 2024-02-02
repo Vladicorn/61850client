@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"math"
 	"strconv"
 )
@@ -178,7 +179,7 @@ func (a *AARQApdu) encode(reverseOS *ReverseByteArrayOutputStream, withTag bool)
 	return codeLength
 }
 
-func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
+func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) (int, error) {
 
 	tlByteCount := 0
 	vByteCount := 0
@@ -206,7 +207,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.applicationContextName.decode(is, true)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	} else {
@@ -219,7 +220,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.calledAPTitle.decode(is, nil)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -230,7 +231,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.calledAEQualifier.decode(is, nil)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -241,7 +242,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.calledAPInvocationIdentifier.decode(is, true)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -252,7 +253,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.calledAEInvocationIdentifier.decode(is, true)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -263,7 +264,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.callingAPTitle.decode(is, nil)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -274,7 +275,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.callingAEQualifier.decode(is, nil)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -285,7 +286,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.callingAPInvocationIdentifier.decode(is, true)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -296,7 +297,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		vByteCount += a.callingAEInvocationIdentifier.decode(is, true)
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -305,7 +306,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.senderAcseRequirements = NewACSERequirements()
 		vByteCount += a.senderAcseRequirements.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -314,7 +315,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.mechanismName = NewMechanismName()
 		vByteCount += a.mechanismName.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -322,10 +323,14 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 	if berTag.equals(128, 32, 12) {
 		vByteCount += length.decode(is)
 		a.callingAuthenticationValue = NewAuthenticationValue()
-		vByteCount += a.callingAuthenticationValue.decode(is, nil)
+		vByteCountD, err := a.callingAuthenticationValue.decode(is, nil)
+		if err != nil {
+			return 0, err
+		}
+		vByteCount += vByteCountD
 		vByteCount += length.readEocIfIndefinite(is)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -334,7 +339,7 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.applicationContextNameList = NewApplicationContextNameList()
 		vByteCount += a.applicationContextNameList.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
@@ -343,30 +348,33 @@ func (a *AARQApdu) decode(is *bytes.Buffer, withTag bool) int {
 		a.implementationInformation = NewImplementationData()
 		vByteCount += a.implementationInformation.decode(is, false)
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	if berTag.equals(128, 32, 30) {
 		a.userInformation = NewAssociationInformation()
-		vByteCount += a.userInformation.decode(is, false)
+		vByteCountD, err := a.userInformation.decode(is, false)
+		if err != nil {
+			return 0, err
+		}
+		vByteCount += vByteCountD
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	}
 
 	if lengthVal < 0 {
 		if !berTag.equals(0, 0, 0) {
-			throw("Decoded sequence has wrong end of contents octets")
+			return 0, errors.New("Decoded sequence has wrong end of contents octets")
 		}
 		vByteCount += readEocByte(is)
-		return tlByteCount + vByteCount
+		return tlByteCount + vByteCount, nil
 	}
 
-	throw("Unexpected end of sequence, length tag: ", strconv.Itoa(lengthVal), ", bytes decoded: ", strconv.Itoa(vByteCount))
-	return 0
+	return 0, errors.New("Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
 }
 
 func NewAARQApdu() *AARQApdu {

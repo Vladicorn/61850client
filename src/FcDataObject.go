@@ -1,6 +1,7 @@
 package src
 
 import (
+	"log"
 	"strconv"
 )
 
@@ -37,7 +38,6 @@ func (n *FcDataObject) getMmsDataObj() *Data {
 }
 
 func (n *FcDataObject) setValueFromMmsDataObj(data *Data) {
-	//	log.Println("FcDataObject")
 	if data.structure == nil {
 		throw("TYPE_CONFLICT expected type: structure")
 	}
@@ -45,6 +45,7 @@ func (n *FcDataObject) setValueFromMmsDataObj(data *Data) {
 		throw(
 			"TYPE_CONFLICT  expected type: structure with " + strconv.Itoa(len(n.Children)) + " elements")
 	}
+<<<<<<< Updated upstream
 	/*index := 0
 	for _, child := range n.Children {
 		child.setValueFromMmsDataObj(data.structure.seqOf[index])
@@ -52,112 +53,89 @@ func (n *FcDataObject) setValueFromMmsDataObj(data *Data) {
 	}
 
 	*/
+=======
+>>>>>>> Stashed changes
 
 	i := 0
 	for _, child := range n.Children {
-
 		if _, ok := child.(*ConstructedDataAttribute); ok {
-			//log.Println("ConstructedDataAttribute Data", child.(*ConstructedDataAttribute))
 			for _, data1 := range data.structure.seqOf {
 				if data1.structure != nil {
 					child.setValueFromMmsDataObj(data1)
-
 				}
 			}
-
 		}
+
 		if _, ok := child.(*BdaQuality); ok {
-			//	log.Println("BdaQuality Data", child.(*BdaQuality))
 			for _, data1 := range data.structure.seqOf {
 				if data1.bitString != nil {
 					child.setValueFromMmsDataObj(data1)
-
 				}
-
 			}
-
 		}
+
 		if _, ok := child.(*BdaBoolean); ok {
 			for _, data1 := range data.structure.seqOf {
 				if data1.bool != nil {
 					child.setValueFromMmsDataObj(data1)
 				}
 			}
-
 		}
+
 		if _, ok := child.(*BdaInt8U); ok {
-			//	log.Println("BdaInt8U Data", child.(*BdaInt8U))
 			for _, data1 := range data.structure.seqOf {
 				if data1.unsigned != nil {
 					child.setValueFromMmsDataObj(data1)
-
 				}
-
 			}
-
 		}
+
 		if _, ok := child.(*BdaInt8); ok {
 			for _, data1 := range data.structure.seqOf {
 				if data1.integer != nil {
 					child.setValueFromMmsDataObj(data1)
-
 				}
 			}
 
 		}
+
 		if _, ok := child.(*BdaInt32); ok {
 			for _, data1 := range data.structure.seqOf {
 				if data1.integer != nil {
 					child.setValueFromMmsDataObj(data1)
-
 				}
 			}
 		}
+
 		if _, ok := child.(*BdaFloat32); ok {
 			for _, data1 := range data.structure.seqOf {
 				if data1.FloatingPoint != nil {
-
 					child.setValueFromMmsDataObj(data1)
-
 				}
-
 			}
-
 		}
+
 		if _, ok := child.(*BdaFloat64); ok {
 			for _, data1 := range data.structure.seqOf {
 				if data1.FloatingPoint != nil {
-
 					child.setValueFromMmsDataObj(data1)
-
 				}
-
 			}
-
 		}
+
 		if _, ok := child.(*BdaTimestamp); ok {
-			//log.Println("BdaTimestamp Data", child.(*BdaTimestamp))
 			for _, data1 := range data.structure.seqOf {
 				if data1.utcTime != nil {
-
 					child.setValueFromMmsDataObj(data1)
-
 				}
 			}
-
 		}
+
 		if _, ok := child.(*BdaDoubleBitPos); ok {
-			//log.Println("BdaDoubleBitPos Data", child.(*BdaDoubleBitPos))
 			for _, data1 := range data.structure.seqOf {
 				_ = data1
-				//	log.Println("FcDataObject", data1)
-				/*if data1. != nil {
-					child.setValueFromMmsDataObj(data1)
-				}
-
-				*/
+				log.Println("BdaDoubleBitPos не сделан", data1)
 			}
-			return
 		}
 
 		i++

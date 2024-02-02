@@ -65,7 +65,7 @@ func NewTConnection(socket *net.Conn, maxTPduSizeParam int, messageTimeout int, 
  * @throws TimeoutException this exception is thrown if the first byte of Newmessage is not
  *     received within the message timeout.
  */
-func (t *TConnection) receive(tSduBuffer *bytes.Buffer) {
+func (t *TConnection) receive(tSduBuffer *bytes.Buffer) error {
 	//socket := *t.Socket
 	is := t.is
 
@@ -81,7 +81,10 @@ func (t *TConnection) receive(tSduBuffer *bytes.Buffer) {
 	//if err != nil {
 	//	panic(err)
 	//}
-	version := readByte(is)
+	version, err := readByte(is)
+	if err != nil {
+		return err
+	}
 	//if err != nil {
 	//	panic(err)
 	//}
@@ -94,8 +97,12 @@ func (t *TConnection) receive(tSduBuffer *bytes.Buffer) {
 			panic(errors.New("syntax error at beginning of RFC1006 header: version not equal to 3"))
 		}
 		// read reserved
-		if readByte(is) != 0 {
-			panic(errors.New("syntax errorat beginning of RFC1006 header: reserved not equal to 0"))
+		n, err := readByte(is)
+		if err != nil {
+			return err
+		}
+		if n != 0 {
+			return errors.New("syntax errorat beginning of RFC1006 header: reserved not equal to 0")
 		}
 
 		// read packet length
@@ -104,10 +111,17 @@ func (t *TConnection) receive(tSduBuffer *bytes.Buffer) {
 			panic(errors.New("syntax error: packet length parameter < 7"))
 		}
 		// read length indicator
-		li = int(readByte(is) & 0xff)
+		nb, err := readByte(is)
+		if err != nil {
+			return err
+		}
+		li = int(nb & 0xff)
 
 		// read TPDU code
-		b := readByte(is)
+		b, err := readByte(is)
+		if err != nil {
+			return err
+		}
 		tPduCode = int(b & 0xff)
 
 		if tPduCode == 0xf0 {
@@ -118,7 +132,11 @@ func (t *TConnection) receive(tSduBuffer *bytes.Buffer) {
 			}
 
 			// read EOT
-			eot = int(readByte(is) & 0xff)
+			nb, err = readByte(is)
+			if err != nil {
+				return err
+			}
+			eot = int(nb & 0xff)
 			if eot != 0 && eot != 0x80 {
 				panic(errors.New("syntax error: eot wrong"))
 
@@ -152,7 +170,11 @@ func (t *TConnection) receive(tSduBuffer *bytes.Buffer) {
 			}
 
 			// check the reason field, for class 0 only between 1 and 4
-			reason := readByte(is) & 0xff
+			nb, err = readByte(is)
+			if err != nil {
+				return err
+			}
+			reason := nb & 0xff
 			if reason > 4 {
 				panic(errors.New("syntax error: reason out of bound"))
 			}
@@ -166,10 +188,14 @@ func (t *TConnection) receive(tSduBuffer *bytes.Buffer) {
 		}
 
 		if eot != 0x80 {
-			version = readByte(is)
+			version, err = readByte(is)
+			if err != nil {
+				return err
+			}
 		}
 
 	}
+	return nil
 }
 
 /**
@@ -177,7 +203,7 @@ func (t *TConnection) receive(tSduBuffer *bytes.Buffer) {
  *
  * @throws IOException if an error occurs
  */
-func (t *TConnection) startConnection() {
+func (t *TConnection) startConnection() error {
 	os := t.os
 	is := t.is
 	// writeByte RFC 1006 Header
@@ -254,38 +280,71 @@ func (t *TConnection) startConnection() {
 	var myByte byte
 	var lengthIndicator int
 	var parameterLength int
-	if readByte(is) != 0x03 {
-		panic(errors.New("io error"))
+
+	nb, err := readByte(is)
+	if err != nil {
+		return err
 	}
-	if readByte(is) != 0 {
-		panic(errors.New("io error"))
+	if nb != 0x03 {
+		return errors.New("io error")
 	}
+
+	nb, err = readByte(is)
+	if err != nil {
+		return err
+	}
+	if nb != 0 {
+		return errors.New("io error")
+	}
+
 	// read packet length, but is not needed
 	readShort(is)
-	lengthIndicator = int(readByte(is) & 0xff)
-	if (readByte(is) & 0xff) != 0xd0 {
-		panic(errors.New("io error"))
+	nb, err = readByte(is)
+	if err != nil {
+		return err
+	}
+	lengthIndicator = int(nb & 0xff)
+	nb, err = readByte(is)
+	if err != nil {
+		return err
+	}
+	if (nb & 0xff) != 0xd0 {
+		return errors.New("io error")
 	}
 	// read the dstRef which is the srcRef for t end-point
 	readShort(is)
 	// read the srcRef which is the dstRef for t end-point
 	t.dstRef = readShort(is) & 0xffff
 	// read class
-	if readByte(is) != 0 {
-		panic(errors.New("io error"))
+	nb, err = readByte(is)
+	if err != nil {
+		return err
+	}
+	if nb != 0 {
+		return errors.New("io error")
 	}
 
 	variableBytesRead := 0
 	for lengthIndicator > (6 + variableBytesRead) {
 		// read parameter code
-		myByte = readByte(is)
+		myByte, err = readByte(is)
+		if err != nil {
+			return err
+		}
 		switch myByte & 0xff {
 		case 0xc1:
-			parameterLength = int(readByte(is) & 0xff)
+			nb, err = readByte(is)
+			if err != nil {
+				return err
+			}
+			parameterLength = int(nb & 0xff)
 
 			if t.TSelLocal == nil {
 				t.TSelLocal = make([]byte, parameterLength)
-				is.Read(t.TSelLocal)
+				_, err = is.Read(t.TSelLocal)
+				if err != nil {
+					return err
+				}
 			} else {
 				for i := 0; i < parameterLength; i++ {
 					read(is)
@@ -295,7 +354,11 @@ func (t *TConnection) startConnection() {
 			variableBytesRead += 2 + parameterLength
 			break
 		case 0xc2:
-			parameterLength = int(readByte(is) & 0xff)
+			nb, err = readByte(is)
+			if err != nil {
+				return err
+			}
+			parameterLength = int(nb & 0xff)
 
 			if t.TSelRemote == nil {
 				t.TSelRemote = make([]byte, parameterLength)
@@ -312,13 +375,19 @@ func (t *TConnection) startConnection() {
 			break
 
 		case 0xc0:
-			if readByte(is) != 1 {
-				panic(errors.New("maxTPduSizeParam size is not equal to 1"))
-
+			nb, err = readByte(is)
+			if err != nil {
+				return err
 			}
-			myByte = readByte(is)
+			if nb != 1 {
+				return errors.New("maxTPduSizeParam size is not equal to 1")
+			}
+			myByte, err = readByte(is)
+			if err != nil {
+				return err
+			}
 			if int(myByte&0xff) < 7 || int(myByte&0xff) > t.maxTPduSizeParam {
-				panic(errors.New("maxTPduSizeParam out of bound"))
+				return errors.New("maxTPduSizeParam out of bound")
 
 			} else {
 				if int(myByte&0xff) < t.maxTPduSizeParam {
@@ -328,10 +397,10 @@ func (t *TConnection) startConnection() {
 			variableBytesRead += 4
 			break
 		default:
-			panic(errors.New("io error"))
+			return errors.New("io error")
 		}
 	}
-
+	return nil
 }
 
 /**
@@ -342,6 +411,7 @@ func (t *TConnection) startConnection() {
  *
  * @throws IOException if an error occurs
  */
+/*
 func (t *TConnection) listenForCR() {
 
 	is := t.is
@@ -509,6 +579,8 @@ func (t *TConnection) listenForCR() {
 	}
 
 }
+
+*/
 
 /**
  * Calculates and returns the maximum TPDUSize. This is equal to 2^(maxTPDUSizeParam)

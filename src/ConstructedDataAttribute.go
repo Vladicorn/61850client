@@ -32,7 +32,7 @@ func (c *ConstructedDataAttribute) getMmsDataObj() *Data {
 }
 
 func (c *ConstructedDataAttribute) setValueFromMmsDataObj(data *Data) {
-	//	log.Println("ConstructedDataAttribute", len(data.structure.seqOf))
+	//log.Println("ConstructedDataAttribute", len(data.structure.seqOf))
 
 	if data.structure == nil {
 		log.Println("ServiceError.TYPE_CONFLICT expected type: structure")
@@ -97,7 +97,6 @@ func (c *ConstructedDataAttribute) setValueFromMmsDataObj(data *Data) {
 		if _, ok := child.(*BdaFloat64); ok {
 			for _, data1 := range data.structure.seqOf {
 				if data1.FloatingPoint != nil {
-					//log.Println("BdaFloat64")
 					child.setValueFromMmsDataObj(data1)
 				}
 			}

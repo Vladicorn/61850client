@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -42,7 +43,8 @@ func (m *Myexternal2) encode(reverseOS *ReverseByteArrayOutputStream, withTag bo
 	return codeLength
 }
 
-func (m *Myexternal2) decode(is *bytes.Buffer, withTag bool) int {
+func (m *Myexternal2) decode(is *bytes.Buffer, withTag bool) (int, error) {
+	var err error
 	tlByteCount := 0
 
 	vByteCount := 0
@@ -72,26 +74,28 @@ func (m *Myexternal2) decode(is *bytes.Buffer, withTag bool) int {
 	}
 
 	m.encoding = NewEncoding()
-	numDecodedBytes = m.encoding.decode(is, berTag)
+	numDecodedBytes, err = m.encoding.decode(is, berTag)
+	if err != nil {
+		return 0, err
+	}
 	if numDecodedBytes != 0 {
 		vByteCount += numDecodedBytes
 		if lengthVal >= 0 && vByteCount == lengthVal {
-			return tlByteCount + vByteCount
+			return tlByteCount + vByteCount, nil
 		}
 		vByteCount += berTag.decode(is)
 	} else {
-		throw("tag does not match mandatory sequence component.")
+		return 0, errors.New("tag does not match mandatory sequence component.")
 	}
 	if lengthVal < 0 {
 		if !berTag.equals(0, 0, 0) {
-			throw("Decoded sequence has wrong end of contents octets")
+			return 0, errors.New("Decoded sequence has wrong end of contents octets")
 		}
 		vByteCount += readEocByte(is)
-		return tlByteCount + vByteCount
+		return tlByteCount + vByteCount, nil
 	}
 
-	throw("Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
-	return 0
+	return 0, errors.New("Unexpected end of sequence, length tag: " + strconv.Itoa(lengthVal) + ", bytes decoded: " + strconv.Itoa(vByteCount))
 }
 
 func NewMyexternal2() *Myexternal2 {
