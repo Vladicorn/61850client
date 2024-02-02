@@ -41,20 +41,11 @@ func (n *FcDataObject) setValueFromMmsDataObj(data *Data) {
 	if data.structure == nil {
 		throw("TYPE_CONFLICT expected type: structure")
 	}
+
 	if len(data.structure.seqOf) != len(n.Children) {
 		throw(
 			"TYPE_CONFLICT  expected type: structure with " + strconv.Itoa(len(n.Children)) + " elements")
 	}
-<<<<<<< Updated upstream
-	/*index := 0
-	for _, child := range n.Children {
-		child.setValueFromMmsDataObj(data.structure.seqOf[index])
-		index++
-	}
-
-	*/
-=======
->>>>>>> Stashed changes
 
 	i := 0
 	for _, child := range n.Children {

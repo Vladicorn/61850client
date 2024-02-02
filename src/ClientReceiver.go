@@ -115,12 +115,6 @@ func (r *ClientReceiver) run() error {
 				if r.expectedResponseId == -1 {
 					// Discarding ConfirmedResponse MMS PDU because no listener for request was found.
 					return
-<<<<<<< Updated upstream
-				} else if decodedResponsePdu.confirmedResponsePDU.invokeID.value != r.expectedResponseId {
-					// Discarding ConfirmedResponse MMS PDU because no listener with fitting invokeID
-					// was
-					// found.
-=======
 				} else if decodedResponsePdu.confirmedResponsePDU != nil {
 					if decodedResponsePdu.confirmedResponsePDU.invokeID.value != r.expectedResponseId {
 						// Discarding ConfirmedResponse MMS PDU because no listener with fitting invokeID
@@ -132,11 +126,9 @@ func (r *ClientReceiver) run() error {
 					}
 				} else {
 					r.association.Close()
->>>>>>> Stashed changes
 					return
-				} else {
-					r.association.incomingResponses <- decodedResponsePdu
 				}
+
 			}()
 
 		}
@@ -150,6 +142,7 @@ func (r *ClientReceiver) close(err any) {
 	defer r.lock.Unlock()
 	if r.closed == false {
 		r.closed = true
+
 		r.association.AcseAssociation.disconnect()
 
 		if r.reportListener != nil {
@@ -296,13 +289,9 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) (*Report, error) {
 
 	index++
 
-<<<<<<< Updated upstream
-	inclusionBitString := listRes[index].success.bitString.bitCheck()
-=======
 	//countBit := 223
 	countBit := len(listRes[index].success.bitString.value) * 7
 	inclusionBitString := listRes[index].success.bitString.bitCheck(countBit)
->>>>>>> Stashed changes
 	numMembersReported := 0
 	for _, bit := range inclusionBitString {
 		if bit {
@@ -325,12 +314,8 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) (*Report, error) {
 	reportedDataSetMembers := make([]FcModelNodeI, 0)
 	reportedDataSetMembersMap := make(map[string]FcModelNodeI)
 	//reportedDataSetMembers := make([]*FcModelNode, numMembersReported)
-<<<<<<< Updated upstream
-	dataSetIndex := 7
-=======
 	dataSetIndex := countBit
 	//dataSetIndex := 0
->>>>>>> Stashed changes
 	index++
 
 	for _, dataSetMember := range dataSet.getMembers() {
@@ -339,18 +324,13 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) (*Report, error) {
 
 			//TPDO
 			//dataSetMemberCopy := dataSetMember.copy()
-<<<<<<< Updated upstream
-			log.Println(accessRes.success)
-=======
 
->>>>>>> Stashed changes
 			dataSetMember.setValueFromMmsDataObj(accessRes.success)
 			reportedDataSetMembers = append(reportedDataSetMembers, dataSetMember.(FcModelNodeI))
 			reportedDataSetMembersMap[strings.ReplaceAll(listRes[index-numMembersReported].success.visibleString.toString(), "$", ".")] = dataSetMember.(FcModelNodeI)
 
 			index++
 		}
-
 		dataSetIndex--
 	}
 
