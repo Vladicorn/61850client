@@ -29,7 +29,7 @@ func main() {
 
 
 	*/
-	src.GetTree(association)
+	src.GetTreeSl(association)
 
 	for {
 		select {
