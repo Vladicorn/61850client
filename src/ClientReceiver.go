@@ -24,29 +24,11 @@ func NewClientReceiver(maxMmsPduSize int, association *ClientAssociation) *Clien
 }
 func (r *ClientReceiver) start() error {
 	go r.run()
+
 	return nil
 }
 
 func (r *ClientReceiver) run() error {
-	/*defer func() {
-		err := recover()
-		if err != nil {
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer func() {
-					recover()
-					wg.Done()
-				}()
-				r.close(err)
-			}()
-			wg.Wait()
-			fmt.Printf("线程退出 %v \n", err)
-		}
-	}()
-
-	*/
-
 	for {
 		r.pduBuffer.Reset()
 		var buffer []byte
@@ -109,27 +91,24 @@ func (r *ClientReceiver) run() error {
 			}()
 
 		} else {
-			func() {
-				defer r.association.incomingResponsesLock.Unlock()
-				r.association.incomingResponsesLock.Lock()
-				if r.expectedResponseId == -1 {
-					// Discarding ConfirmedResponse MMS PDU because no listener for request was found.
-					return
-				} else if decodedResponsePdu.confirmedResponsePDU != nil {
-					if decodedResponsePdu.confirmedResponsePDU.invokeID.value != r.expectedResponseId {
-						// Discarding ConfirmedResponse MMS PDU because no listener with fitting invokeID
-						// was
-						// found.
-						return
-					} else {
-						r.association.incomingResponses <- decodedResponsePdu
-					}
+			//defer r.association.incomingResponsesLock.Unlock()
+			//	r.association.incomingResponsesLock.Lock()
+			if r.expectedResponseId == -1 {
+				// Discarding ConfirmedResponse MMS PDU because no listener for request was found.
+				return err
+			} else if decodedResponsePdu.confirmedResponsePDU != nil {
+				if decodedResponsePdu.confirmedResponsePDU.invokeID.value != r.expectedResponseId {
+					// Discarding ConfirmedResponse MMS PDU because no listener with fitting invokeID
+					// was
+					// found.
+					return err
 				} else {
-					r.association.Close()
-					return
+					r.association.incomingResponses <- decodedResponsePdu
 				}
-
-			}()
+			} else {
+				r.close(err)
+				return err
+			}
 
 		}
 
@@ -138,8 +117,10 @@ func (r *ClientReceiver) run() error {
 }
 
 func (r *ClientReceiver) close(err any) {
+	r.association.Close()
 	r.lock.Lock()
 	defer r.lock.Unlock()
+
 	if r.closed == false {
 		r.closed = true
 
@@ -151,11 +132,8 @@ func (r *ClientReceiver) close(err any) {
 
 		mmsPdu := NewMMSpdu()
 		mmsPdu.confirmedRequestPDU = NewConfirmedRequestPDU()
-
-		r.association.incomingResponses <- mmsPdu
-
+		//r.association.incomingResponses <- mmsPdu
 	}
-
 }
 
 func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) (*Report, error) {

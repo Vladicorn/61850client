@@ -54,6 +54,7 @@ func (m *ModelNode) getParent() ModelNodeI {
 func (m *ModelNode) getChild(name string, fc string) ModelNodeI {
 	return m.Children[name]
 }
+
 func (m *ModelNode) getChildren() map[string]ModelNodeI {
 	return m.Children
 }

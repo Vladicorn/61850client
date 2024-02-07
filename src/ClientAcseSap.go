@@ -28,13 +28,16 @@ func (s *ClientAcseSap) associate(address string, port int, apdu *bytes.Buffer) 
 		return nil, err
 	}
 
-	defer func() {
-		r := recover()
-		if r != nil {
-			a.disconnect()
-			panic(r)
-		}
-	}()
+	/*
+		defer func() {
+			r := recover()
+			if r != nil {
+				a.disconnect()
+				panic(r)
+			}
+		}()
+
+	*/
 	return a, nil
 }
 

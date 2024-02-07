@@ -22,11 +22,15 @@ func (a *AcseAssociation) getAssociateResponseAPdu() *bytes.Buffer {
 	return returnBuffer
 }
 
-func (a *AcseAssociation) disconnect() {
+func (a *AcseAssociation) disconnect() error {
 	a.Connected = false
 	if a.TConnection != nil {
-		a.TConnection.disconnect()
+		err := a.TConnection.disconnect()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (a *AcseAssociation) startAssociation(payload *bytes.Buffer, address string, port int, sSelRemote []byte, sSelLocal []byte, pSelRemote []byte, tSAP *ClientTSap, apTitleCalled []int, apTitleCalling []int, aeQualifierCalled int, aeQualifierCalling int) error {
@@ -399,7 +403,7 @@ func (a *AcseAssociation) extractInteger(buffer *bytes.Buffer, size byte) int64 
 
 func (a *AcseAssociation) receive(pduBuffer *bytes.Buffer) ([]byte, error) {
 	if !a.Connected {
-		throw("ACSE Association not Connected")
+		return []byte{}, errors.New("ACSE Association not Connected")
 	}
 	err := a.TConnection.receive(pduBuffer)
 	if err != nil {

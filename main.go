@@ -8,7 +8,7 @@ import (
 func main() {
 
 	variableBufReport := []string{"DemoMeasurement/LLN0.brcb1"}
-	variableUnBufReport := []string{"DemoMeasurement/LLN0.urcb1", "Bresler43LD1/LLN0.urcbH01", "D001CTRL/LLN0.urcbCTRL_C01", "ied1lDevice1/LLN0.urcb102"}
+	//variableUnBufReport := []string{"DemoMeasurement/LLN0.urcb1", "Bresler43LD1/LLN0.urcbH01", "D001CTRL/LLN0.urcbCTRL_C01", "ied1lDevice1/LLN0.urcb102"}
 	var err error
 	clientSap := src.NewClientSap()
 	event := src.NewClientEventListener()
@@ -20,18 +20,25 @@ func main() {
 
 	err = src.ConnectToBufferReport(association,
 		variableBufReport[0],
-		false)
+		true)
 
-	err = src.ConnectToUnBufferReport(association,
-		variableUnBufReport[0],
-		false)
+	/*
+		err = src.ConnectToUnBufferReport(association,
+			variableUnBufReport[0],
+			false)
 
+
+	*/
 	src.GetTree(association)
 
 	for {
 		select {
-		case report := <-event.Values:
-			log.Println(report)
+		case report, ok := <-event.Values:
+			if !ok {
+				return
+			}
+			_ = report
+			//	log.Println(report)
 		}
 	}
 

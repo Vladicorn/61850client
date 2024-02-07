@@ -2,6 +2,7 @@ package src
 
 import (
 	"log"
+	"strings"
 )
 
 func ConnectToBufferReport(association *ClientAssociation, report string, firstGet bool) error {
@@ -109,50 +110,147 @@ func ConnectToUnBufferReport(association *ClientAssociation, report string, firs
 }
 
 func GetTree(association *ClientAssociation) {
+	treeDataModel := make([]map[string]struct{}, 0)
 	serverModel, _ := association.RetrieveModel()
-	tree := make(map[string]struct{})
-	for num, items := range serverModel.Children {
-		parceTree(num, items, tree)
+	dataSets := make(map[string]map[string]struct{})
+	treeReport := make(map[string]map[string]struct{})
+
+	for nameDataset, datasets := range serverModel.DataSets {
+		tree1 := make(map[string]struct{})
+		for _, members := range datasets.MembersMap {
+			for _, mem := range members {
+
+				ParseFcDataObject(mem, tree1)
+			}
+
+		}
+		dataSets[nameDataset] = tree1
 	}
-}
 
-func parceTree(num string, items ModelNodeI, tree map[string]struct{}) {
-	lg, ok := items.(*LogicalDevice)
-	if ok {
-		for numLg, itemsLg := range lg.Children {
-			lg1 := itemsLg.(*LogicalNode)
-			for numLg1, itemsLg1 := range lg1.Children {
-				//	log.Println(numLg1)
-				switch itemsLg1.(type) {
+	for _, lg := range serverModel.getChildren() {
+		tree := make(map[string]struct{})
+
+		logicalDevice := lg.(*LogicalDevice)
+		for _, ln := range logicalDevice.getChildren() {
+			logicalnode := ln.(*LogicalNode)
+			for _, do := range logicalnode.getChildren() {
+				switch do.(type) {
 				case *FcDataObject:
-					lg2 := itemsLg1.(*FcDataObject)
-					for numLg2 := range lg2.Children {
-						tree[num+"."+numLg+"."+numLg1+"."+numLg2] = struct{}{}
-					}
-
+					ParseFcDataObject(do, tree)
 				case *Urcb:
-					lg2 := itemsLg1.(*Urcb)
-					for numLg2, _ := range lg2.Children {
-						tree[num+"."+numLg+"."+numLg1+"."+numLg2] = struct{}{}
+					tt := do.(*Urcb)
+					datasetRef := tt.ObjectReference.toString() + ".DatSet"
+					fcModelNode1, err := serverModel.AskForFcModelNode(datasetRef, "RP")
+					if err != nil {
+						log.Println(err)
+						return
 					}
+					association.GetDataValues(fcModelNode1)
+					ff := fcModelNode1.(*BdaVisibleString)
+					itemID := strings.ReplaceAll(string(ff.value), "$", ".")
+					treeReport[tt.ObjectReference.toString()] = dataSets[itemID]
 
-					/*
-						aa := lg2.Rcb
-						aa1 := aa.GetObjectReference()
-						log.Println("TRTRT", aa1)
-						//	association.SetDataValues(aa)
-
-					*/
 				case *Brcb:
-					lg2 := itemsLg1.(*Brcb)
-					for numLg2 := range lg2.Children {
-						tree[num+"."+numLg+"."+numLg1+"."+numLg2] = struct{}{}
+					tt := do.(*Brcb)
+					datasetRef := tt.ObjectReference.toString() + ".DatSet"
+					fcModelNode1, err := serverModel.AskForFcModelNode(datasetRef, "BR")
+					if err != nil {
+						log.Println(err)
+						return
 					}
-
+					association.GetDataValues(fcModelNode1)
+					ff := fcModelNode1.(*BdaVisibleString)
+					itemID := strings.ReplaceAll(string(ff.value), "$", ".")
+					treeReport[tt.ObjectReference.toString()] = dataSets[itemID]
 				default:
-					log.Println("Unknown")
+					log.Println("Unknow")
 				}
 			}
 		}
+		treeDataModel = append(treeDataModel, tree)
 	}
+	for treeRepor := range treeReport {
+		log.Println(treeRepor, "    ", treeReport[treeRepor])
+	}
+}
+
+func ParseFcDataObject(lgs ModelNodeI, tree map[string]struct{}) {
+	switch lgs.(type) {
+	case *FcDataObject:
+		val := lgs.(*FcDataObject)
+		logicalNode := val.getChildren()
+		for _, lg := range logicalNode {
+			ParseFcDataObject(lg, tree)
+		}
+	case *BdaBoolean:
+		val := lgs.(*BdaBoolean)
+
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaTimestamp:
+		val := lgs.(*BdaTimestamp)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaQuality:
+		val := lgs.(*BdaQuality)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *ConstructedDataAttribute:
+		val := lgs.(*ConstructedDataAttribute)
+		logicalNode := val.getChildren()
+		for _, lg := range logicalNode {
+			ParseFcDataObject(lg, tree)
+		}
+		//log.Println(val.getChildren())
+		//tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaVisibleString:
+		val := lgs.(*BdaVisibleString)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaCheck:
+		val := lgs.(*BdaCheck)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaOctetString:
+		val := lgs.(*BdaOctetString)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaInt8:
+		val := lgs.(*BdaInt8)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaInt8U:
+		val := lgs.(*BdaInt8U)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaInt16:
+		val := lgs.(*BdaInt16)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaInt16U:
+		val := lgs.(*BdaInt16U)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaInt32:
+		val := lgs.(*BdaInt32)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaInt32U:
+		val := lgs.(*BdaInt32U)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaInt64:
+		val := lgs.(*BdaInt64)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaFloat32:
+		val := lgs.(*BdaFloat32)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaFloat64:
+		val := lgs.(*BdaFloat64)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *FCArray:
+		val := lgs.(*FCArray)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaDoubleBitPos:
+		val := lgs.(*BdaDoubleBitPos)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaTriggerConditions:
+		val := lgs.(*BdaTriggerConditions)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	case *BdaOptFlds:
+		val := lgs.(*BdaOptFlds)
+		tree[val.getObjectReference().toString()] = struct{}{}
+	default:
+		val := lgs.(*BdaQuality)
+		log.Println(val)
+	}
+
 }

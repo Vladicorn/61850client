@@ -63,13 +63,15 @@ func (s *ReverseByteArrayOutputStream) write(byteArray []byte) {
 }
 
 func (s *ReverseByteArrayOutputStream) writeByte(byte byte) {
-	defer func() {
+	/*defer func() {
 		err := recover()
 		if err != nil {
 			s.resize()
 			s.buffer[s.index] = byte
 		}
 	}()
+
+	*/
 	s.buffer[s.index] = byte
 	s.index -= 1
 	return

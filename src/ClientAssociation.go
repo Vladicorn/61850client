@@ -152,7 +152,7 @@ func (c *ClientAssociation) Close() {
 	if c.Closed == false {
 		c.Closed = true
 		go c.AcseAssociation.disconnect()
-		//	go c.reportListener.associationClosed()
+		//go c.reportListener.associationClosed()
 
 		//mmsPdu := NewMMSpdu()
 		//mmsPdu.confirmedRequestPDU = NewConfirmedRequestPDU()
@@ -175,6 +175,7 @@ func (c *ClientAssociation) RetrieveModel() (*ServerModel, error) {
 		}
 		lnNames = append(lnNames, lng)
 	}
+
 	lds := make([]*LogicalDevice, 0)
 	for i := 0; i < len(ldNames); i++ {
 		lns := make([]ModelNodeI, 0)
@@ -187,12 +188,10 @@ func (c *ClientAssociation) RetrieveModel() (*ServerModel, error) {
 	}
 
 	c.ServerModel = NewServerModel(lds, nil)
-
 	err = c.updateDataSets()
 	if err != nil {
 		return nil, err
 	}
-
 	return c.ServerModel, nil
 
 }

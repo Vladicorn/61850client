@@ -681,11 +681,13 @@ func (t *TConnection) send(tsdus [][]byte, offsets []int, lengths []int) {
 }
 
 func (t *TConnection) SendSingle(tsdu []byte, offset int, length int) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = r.(error)
-		}
-	}()
+	/*	defer func() {
+			if r := recover(); r != nil {
+				err = r.(error)
+			}
+		}()
+
+	*/
 	tsdus := make([][]byte, 0)
 	tsdus = append(tsdus, tsdu)
 
@@ -702,7 +704,7 @@ func (t *TConnection) SendSingle(tsdu []byte, offset int, length int) (err error
 }
 
 /** This function sends a Disconnect Request but does not wait for a Disconnect Confirm. */
-func (t *TConnection) disconnect() {
+func (t *TConnection) disconnect() error {
 	defer func() {
 		t.close()
 	}()
@@ -738,10 +740,10 @@ func (t *TConnection) disconnect() {
 
 	err := os.Flush()
 	if err != nil {
-		panic(err)
-
+		return err
 	}
 
+	return nil
 }
 
 /** Will close the TCP connection if It's still open and free any resources of this connection. */

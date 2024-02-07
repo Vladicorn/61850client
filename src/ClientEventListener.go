@@ -10,7 +10,7 @@ type ClientEventListener struct {
 }
 
 func (l *ClientEventListener) associationClosed(err any) {
-
+	close(l.Values)
 }
 
 func (l *ClientEventListener) newReport(report *Report) {

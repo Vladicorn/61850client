@@ -35,7 +35,6 @@ func (n *LogicalNode) addBrcb(brcb *Brcb) {
 }
 
 func (n *LogicalNode) addUrcb(urcb *Urcb, addDataSet bool) {
-
 	n.urcbs[urcb.ObjectReference.getName()] = urcb
 	if addDataSet {
 		dataSetRef := urcb.getDatSet().getStringValue()
@@ -54,6 +53,7 @@ func NewLogicalNode(objectReference *ObjectReference, fcDataObjects []FcDataObje
 	l.brcbs = make(map[string]*Brcb)
 
 	for _, fcDataObject := range fcDataObjects {
+
 		key := fcDataObject.GetObjectReference().getName() + fcDataObject.getFc()
 		l.Children[key] = fcDataObject
 
