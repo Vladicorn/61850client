@@ -1,6 +1,5 @@
 package src
 
-import "C"
 import (
 	"errors"
 	"strconv"

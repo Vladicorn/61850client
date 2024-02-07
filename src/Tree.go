@@ -1,8 +1,8 @@
 package src
 
 import (
-	"encoding/json"
-	"log"
+	"errors"
+	"strings"
 )
 
 type Type61850 int
@@ -21,30 +21,39 @@ type Leaf struct {
 	Childs []*Leaf
 }
 
-func GetTreeSl(association *ClientAssociation) {
-	serverModel, _ := association.RetrieveModel()
-	//	treeDataModel := make([]map[string]struct{}, 0)
-	//	dataSets := make(map[string]map[string]struct{})
-	//	treeReport := make(map[string]map[string]struct{})
+func GetTreeSl(association *ClientAssociation) ([]*Leaf, error) {
+	mainTree := make([]*Leaf, 2)
+	serverModel, err := association.RetrieveModel()
+	if err != nil {
+		return nil, err
+	}
+	dataSets := make(map[string][]*Leaf)
 
 	mainRoot := make([]*Leaf, 0, len(serverModel.getChildren()))
+	mainReport := make([]*Leaf, 0, len(serverModel.getChildren()))
 
-	/*for nameDataset, datasets := range serverModel.DataSets {
-		tree1 := make(map[string]struct{})
+	for nameDataset, datasets := range serverModel.DataSets {
+		childTree := make([]*Leaf, 0, len(datasets.MembersMap))
+		ret := &Leaf{
+			Path:   nameDataset,
+			Var:    true,
+			Type:   IEC61850_VALTYPE_DIRECTORY,
+			Childs: childTree,
+		}
+
 		for _, members := range datasets.MembersMap {
 			for _, mem := range members {
-
-				ParseFcDataObjectSl(mem, tree1)
+				err = ParseFcDataObjectSl(mem, ret)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 		}
-		dataSets[nameDataset] = tree1
+		dataSets[nameDataset] = ret.Childs
 	}
 
-	*/
-
 	for _, lg := range serverModel.getChildren() {
-		//tree := make(map[string]struct{})
 
 		logicalDevice := lg.(*LogicalDevice)
 
@@ -84,49 +93,73 @@ func GetTreeSl(association *ClientAssociation) {
 
 					retL1.Childs = append(retL1.Childs, retL2)
 
-					ParseFcDataObjectSl(do, retL2)
-				/*case *Urcb:
+					err = ParseFcDataObjectSl(do, retL2)
+					if err != nil {
+						return nil, err
+					}
+				case *Urcb:
 					tt := do.(*Urcb)
 					datasetRef := tt.ObjectReference.toString() + ".DatSet"
 					fcModelNode1, err := serverModel.AskForFcModelNode(datasetRef, "RP")
 					if err != nil {
-						log.Println(err)
-						return
+						return nil, err
 					}
 					association.GetDataValues(fcModelNode1)
 					ff := fcModelNode1.(*BdaVisibleString)
 					itemID := strings.ReplaceAll(string(ff.value), "$", ".")
-					treeReport[tt.ObjectReference.toString()] = dataSets[itemID]
+					retReport := &Leaf{
+						Path:   itemID,
+						Var:    true,
+						Type:   IEC61850_VALTYPE_DIRECTORY,
+						Childs: dataSets[itemID],
+					}
+					mainReport = append(mainReport, retReport)
 
 				case *Brcb:
 					tt := do.(*Brcb)
 					datasetRef := tt.ObjectReference.toString() + ".DatSet"
 					fcModelNode1, err := serverModel.AskForFcModelNode(datasetRef, "BR")
 					if err != nil {
-						log.Println(err)
-						return
+						return nil, err
 					}
 					association.GetDataValues(fcModelNode1)
 					ff := fcModelNode1.(*BdaVisibleString)
 					itemID := strings.ReplaceAll(string(ff.value), "$", ".")
-					treeReport[tt.ObjectReference.toString()] = dataSets[itemID]
+					retReport := &Leaf{
+						Path:   itemID,
+						Var:    true,
+						Type:   IEC61850_VALTYPE_DIRECTORY,
+						Childs: dataSets[itemID],
+					}
+					mainReport = append(mainReport, retReport)
 
-				*/
 				default:
-					//	log.Println("Unknow")
+					return nil, errors.New("unknown type")
 				}
 			}
 		}
-
-		//treeDataModel = append(treeDataModel, tree)
 	}
 
-	byt, _ := json.Marshal(mainRoot)
-	log.Println(string(byt))
+	retMainDataModel := &Leaf{
+		Path:   "DataModels",
+		Var:    true,
+		Type:   IEC61850_VALTYPE_DIRECTORY,
+		Childs: mainRoot,
+	}
 
+	retMainReports := &Leaf{
+		Path:   "Reports",
+		Var:    true,
+		Type:   IEC61850_VALTYPE_DIRECTORY,
+		Childs: mainRoot,
+	}
+	mainTree[0] = retMainDataModel
+	mainTree[1] = retMainReports
+
+	return mainTree, nil
 }
 
-func ParseFcDataObjectSl(lgs ModelNodeI, tree *Leaf) {
+func ParseFcDataObjectSl(lgs ModelNodeI, tree *Leaf) error {
 	switch lgs.(type) {
 	case *FcDataObject:
 		val := lgs.(*FcDataObject)
@@ -141,7 +174,10 @@ func ParseFcDataObjectSl(lgs ModelNodeI, tree *Leaf) {
 		}
 		tree.Childs = append(tree.Childs, ret)
 		for _, lg := range logicalNode {
-			ParseFcDataObjectSl(lg, ret)
+			err := ParseFcDataObjectSl(lg, ret)
+			if err != nil {
+				return err
+			}
 		}
 	case *BdaBoolean:
 		val := lgs.(*BdaBoolean)
@@ -180,7 +216,10 @@ func ParseFcDataObjectSl(lgs ModelNodeI, tree *Leaf) {
 		tree.Childs = append(tree.Childs, ret)
 
 		for _, lg := range logicalNode {
-			ParseFcDataObjectSl(lg, ret)
+			err := ParseFcDataObjectSl(lg, ret)
+			if err != nil {
+				return err
+			}
 		}
 
 	case *BdaVisibleString:
@@ -312,8 +351,7 @@ func ParseFcDataObjectSl(lgs ModelNodeI, tree *Leaf) {
 		}
 		tree.Childs = append(tree.Childs, ret)
 	default:
-		val := lgs.(*BdaQuality)
-		log.Println(val)
+		return errors.New("unknown type")
 	}
-
+	return nil
 }
