@@ -7,8 +7,8 @@ import (
 
 func main() {
 
-	variableBufReport := []string{"DemoMeasurement/LLN0.brcb1"}
-	//variableUnBufReport := []string{"DemoMeasurement/LLN0.urcb1", "Bresler43LD1/LLN0.urcbH01", "D001CTRL/LLN0.urcbCTRL_C01", "ied1lDevice1/LLN0.urcb102"}
+	//variableBufReport := []string{"DemoMeasurement/LLN0.brcb1"}
+	variableUnBufReport := []string{"ied1lDevice1/LLN0.urcb101", "Bresler43LD1/LLN0.urcbH01", "D001CTRL/LLN0.urcbCTRL_C01", "ied1lDevice1/LLN0.urcb102"}
 	var err error
 	clientSap := src.NewClientSap()
 	event := src.NewClientEventListener()
@@ -17,28 +17,30 @@ func main() {
 		log.Println(err)
 		return
 	}
-
-	err = src.ConnectToBufferReport(association,
-		variableBufReport[0],
-		true)
-
+	//readValue(association)
 	/*
-		err = src.ConnectToUnBufferReport(association,
-			variableUnBufReport[0],
-			false)
-
+		err = src.ConnectToBufferReport(association,
+			variableBufReport[0],
+			true)
 
 	*/
-	src.GetTreeSl(association)
+	err = src.ConnectToUnBufferReport(association,
+		variableUnBufReport[0],
+		false)
+
+	//	ff, mapka, _ := src.GetTreeSl(association)
 
 	for {
 		select {
-		case report, ok := <-event.Values:
+		case report, ok := <-event.Data:
 			if !ok {
 				return
 			}
-			_ = report
-			//log.Println(report)
+			log.Println(report.ReportName)
+			for name, val := range report.Values {
+				log.Println(name)
+				log.Println(val)
+			}
 		}
 	}
 
@@ -133,20 +135,17 @@ func readValue(association *src.ClientAssociation) error {
 	log.Println(ttt)
 	//fcModelNode := serverModel.AskForFcModelNode("ied1lDevice1/MMXU1.TotW.mag.f", "MX")
 	//fcModelNode := serverModel.AskForFcModelNode("Demo1ProtCtrl/LLN0.Mod.stVal", "ST")
-	fcModelNode1, err := serverModel.AskForFcModelNode("Demo1Measurement/I3pMHAI1.Mod.ctlModel", "CF")
-	if err != nil {
-		return err
-	}
-	fcModelNode2, err := serverModel.AskForFcModelNode("Demo1Measurement/LLN0.NamPlt.vendor", "DC")
+	//fcModelNode1, err := serverModel.AskForFcModelNode("Demo1Measurement/I3pMHAI1.Mod.ctlModel", "CF")
+	fcModelNode1, err := serverModel.AskForFcModelNode("ied1lDevice1/MMXU1.TotW.mag.f", "MX")
 	if err != nil {
 		return err
 	}
 
 	association.GetDataValues(fcModelNode1)
-	association.GetDataValues(fcModelNode2)
+
 	fcNodeBasic1 := fcModelNode1.(src.BasicDataAttributeI)
-	fcNodeBasic2 := fcModelNode2.(src.BasicDataAttributeI)
-	println(fcNodeBasic1.GetValueString())
-	println(fcNodeBasic2.GetValueString())
+
+	//println(fcNodeBasic1.GetValueString())
+	log.Println(fcNodeBasic1.GetValueString())
 	return nil
 }

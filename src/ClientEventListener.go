@@ -6,15 +6,21 @@ import (
 )
 
 type ClientEventListener struct {
-	Values chan map[string]MMSTelegram
+	Data chan EventData
+}
+
+type EventData struct {
+	Values     map[string]MMSTelegram
+	ReportName string
 }
 
 func (l *ClientEventListener) associationClosed(err any) {
-	close(l.Values)
+	close(l.Data)
 }
 
 func (l *ClientEventListener) newReport(report *Report) {
 	values := make(map[string]MMSTelegram)
+
 	for dataRef, modelNode := range report.reportedDataSetMembersMap {
 		if modelNode.getMmsDataObj().structure != nil {
 			l.parceModelNode(modelNode.getMmsDataObj(), dataRef, values)
@@ -22,7 +28,11 @@ func (l *ClientEventListener) newReport(report *Report) {
 			l.getValue(modelNode.getMmsDataObj(), dataRef, values)
 		}
 	}
-	l.Values <- values
+	data := EventData{
+		Values:     values,
+		ReportName: report.rptId,
+	}
+	l.Data <- data
 }
 
 func Float32frombytes(bytes []byte) float32 {
@@ -102,6 +112,7 @@ func (l *ClientEventListener) parceModelNode(data *Data, dataRef string, values 
 }
 
 func NewClientEventListener() *ClientEventListener {
-	value := make(chan map[string]MMSTelegram)
-	return &ClientEventListener{Values: value}
+	data := make(chan EventData)
+
+	return &ClientEventListener{Data: data}
 }
