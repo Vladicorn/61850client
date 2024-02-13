@@ -49,7 +49,7 @@ func ConnectToBufferReport(association *ClientAssociation, report string, firstG
 	return nil
 }
 
-func ConnectToUnBufferReport(association *ClientAssociation, report string, firstGet bool) error {
+func ConnectToUnBufferReport(association *ClientAssociation, report string, firstGet bool, nameReport string) error {
 	// добавить тэг TrgOps - указывает, какие события будут вызывать отчеты. Возможные события:
 	serverModel, _ := association.RetrieveModel()
 	//1
@@ -62,6 +62,19 @@ func ConnectToUnBufferReport(association *ClientAssociation, report string, firs
 	if err != nil {
 		return err
 	}
+
+	//7
+	fcModelNode7, err := serverModel.AskForFcModelNode(report+".RptID", "RP")
+	if err != nil {
+		return err
+	}
+
+	fcModelNode7.(*BdaVisibleString).SetValue(nameReport)
+	err = association.SetDataValues(fcModelNode7)
+	if err != nil {
+		return err
+	}
+
 	//4
 	fcModelNode6, err := serverModel.AskForFcModelNode(report+".OptFlds", "RP")
 	if err != nil {

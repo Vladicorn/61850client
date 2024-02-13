@@ -3,6 +3,7 @@ package src
 import (
 	"bytes"
 	"errors"
+	"log"
 	"strings"
 	"sync"
 )
@@ -162,7 +163,7 @@ func (r *ClientReceiver) processReport(mmsPdu *MMSpdu) (*Report, error) {
 
 	//RPTID - visible-string идентификатор отчета идентифицирует RCB, вызвавший создание отчета. Оно соответствует полю RptID RCB.
 	rptId := listRes[index].success.visibleString.toString()
-
+	log.Println(rptId)
 	//OptFlds - bit-string равно полю OptFlds соответствующего RCB.
 	index++
 	if listRes[index].success.bitString == nil {

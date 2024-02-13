@@ -26,7 +26,7 @@ func main() {
 	*/
 	err = src.ConnectToUnBufferReport(association,
 		variableUnBufReport[0],
-		false)
+		false, "urbc111")
 
 	//	ff, mapka, _ := src.GetTreeSl(association)
 
