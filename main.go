@@ -28,7 +28,7 @@ func main() {
 		variableUnBufReport[0],
 		false, "urbc111")
 
-	//	ff, mapka, _ := src.GetTreeSl(association)
+	src.GetTreeSl(association)
 
 	for {
 		select {
@@ -36,10 +36,10 @@ func main() {
 			if !ok {
 				return
 			}
-			log.Println(report.ReportName)
+
 			for name, val := range report.Values {
 				log.Println(name)
-				log.Println(val)
+				log.Println(val.Name)
 			}
 		}
 	}

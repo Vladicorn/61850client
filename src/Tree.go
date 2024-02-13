@@ -122,6 +122,7 @@ func GetTreeSl(association *ClientAssociation) ([]*Leaf, map[string]*Leaf, error
 					datasets := serverModel.DataSets[itemID]
 					childTree := make([]*Leaf, 0, len(datasets.MembersMap))
 					name := strings.Split(datasets.DataSetReference, ".")
+
 					ret := &Leaf{
 						Path:   name[0],
 						Var:    false,

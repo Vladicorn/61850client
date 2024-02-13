@@ -14,4 +14,5 @@ type MMSTelegram struct {
 	Value   interface{}
 	Time    uint32
 	Quality []byte
+	Name    string
 }
