@@ -116,38 +116,41 @@ func GetTreeSl(association *ClientAssociation) ([]*Leaf, map[string]*Leaf, error
 					}
 					association.GetDataValues(fcModelNode1)
 					ff := fcModelNode1.(*BdaVisibleString)
+
 					itemID := strings.ReplaceAll(string(ff.value), "$", ".")
 
 					existRoots1 := make(map[string]*Leaf)
-					datasets := serverModel.DataSets[itemID]
-					childTree := make([]*Leaf, 0, len(datasets.MembersMap))
-					name := strings.Split(datasets.DataSetReference, ".")
+					if datasets, ok := serverModel.DataSets[itemID]; ok {
+						logdevice := strings.Split(itemID, "/")
+						name := strings.Split(datasets.DataSetReference, ".")
+						childTree := make([]*Leaf, 0, len(datasets.MembersMap))
+						ret := &Leaf{
+							Path:   name[0],
+							Var:    false,
+							Type:   IEC61850_VALTYPE_DIRECTORY,
+							Childs: childTree,
+						}
+						existRoots[tt.getName()+"@"+logdevice[0]] = ret
 
-					ret := &Leaf{
-						Path:   name[0],
-						Var:    false,
-						Type:   IEC61850_VALTYPE_DIRECTORY,
-						Childs: childTree,
-					}
-
-					for _, members := range datasets.MembersMap {
-						for _, mem := range members {
-							err = ParseFcDataObjectSl(mem, ret, existRoots1, tt.getName()+"@")
-							if err != nil {
-								return nil, nil, err
+						for _, members := range datasets.MembersMap {
+							for _, mem := range members {
+								err = ParseFcDataObjectSl(mem, ret, existRoots1, tt.getName()+"@")
+								if err != nil {
+									return nil, nil, err
+								}
 							}
+
 						}
 
+						retReport := &Leaf{
+							Path:   tt.getName(),
+							Var:    false,
+							Type:   IEC61850_VALTYPE_DIRECTORY,
+							Childs: ret.Childs,
+							FC:     tt.Fc,
+						}
+						mainReport = append(mainReport, retReport)
 					}
-
-					retReport := &Leaf{
-						Path:   tt.getName(),
-						Var:    false,
-						Type:   IEC61850_VALTYPE_DIRECTORY,
-						Childs: ret.Childs,
-						FC:     tt.Fc,
-					}
-					mainReport = append(mainReport, retReport)
 
 				case *Brcb:
 					tt := do.(*Brcb)
@@ -158,36 +161,40 @@ func GetTreeSl(association *ClientAssociation) ([]*Leaf, map[string]*Leaf, error
 					}
 					association.GetDataValues(fcModelNode1)
 					ff := fcModelNode1.(*BdaVisibleString)
-					itemID := strings.ReplaceAll(string(ff.value), "$", "@")
+
+					itemID := strings.ReplaceAll(string(ff.value), "$", ".")
 
 					existRoots1 := make(map[string]*Leaf)
-					datasets := serverModel.DataSets[itemID]
-					childTree := make([]*Leaf, 0, len(datasets.MembersMap))
-					ret := &Leaf{
-						Path:   itemID,
-						Var:    false,
-						Type:   IEC61850_VALTYPE_DIRECTORY,
-						Childs: childTree,
-					}
+					if datasets, ok := serverModel.DataSets[itemID]; ok {
+						name := strings.Split(datasets.DataSetReference, ".")
+						childTree := make([]*Leaf, 0, len(datasets.MembersMap))
+						ret := &Leaf{
+							Path:   name[0],
+							Var:    false,
+							Type:   IEC61850_VALTYPE_DIRECTORY,
+							Childs: childTree,
+						}
+						existRoots[tt.getName()] = ret
 
-					for _, members := range datasets.MembersMap {
-						for _, mem := range members {
-							err = ParseFcDataObjectSl(mem, ret, existRoots1, tt.getName()+".")
-							if err != nil {
-								return nil, nil, err
+						for _, members := range datasets.MembersMap {
+							for _, mem := range members {
+								err = ParseFcDataObjectSl(mem, ret, existRoots1, tt.getName()+"@")
+								if err != nil {
+									return nil, nil, err
+								}
 							}
+
 						}
 
+						retReport := &Leaf{
+							Path:   tt.getName(),
+							Var:    false,
+							Type:   IEC61850_VALTYPE_DIRECTORY,
+							Childs: ret.Childs,
+							FC:     tt.Fc,
+						}
+						mainReport = append(mainReport, retReport)
 					}
-
-					retReport := &Leaf{
-						Path:   tt.getName(),
-						Var:    false,
-						Type:   IEC61850_VALTYPE_DIRECTORY,
-						Childs: dataSets[itemID],
-						FC:     tt.Fc,
-					}
-					mainReport = append(mainReport, retReport)
 
 				default:
 					return nil, nil, errors.New("unknown type")
@@ -220,6 +227,7 @@ func ParseFcDataObjectSl(lgs ModelNodeI, tree *Leaf, existRoots map[string]*Leaf
 	case *FcDataObject:
 		val := lgs.(*FcDataObject)
 		logicalNode := val.getChildren()
+
 		var ret *Leaf
 		if existRoot, ok := existRoots[val.getObjectReference().toString()]; !ok {
 			childTree := make([]*Leaf, 0, len(logicalNode))
@@ -279,6 +287,7 @@ func ParseFcDataObjectSl(lgs ModelNodeI, tree *Leaf, existRoots map[string]*Leaf
 	case *ConstructedDataAttribute:
 		val := lgs.(*ConstructedDataAttribute)
 		logicalNode := val.getChildren()
+		//log.Println(val.getMmsVariableDef().tag)
 		var ret *Leaf
 		if existRoot, ok := existRoots[val.getObjectReference().toString()]; !ok {
 			childTree := make([]*Leaf, 0, len(logicalNode))

@@ -22,6 +22,7 @@ func (l *ClientEventListener) newReport(report *Report) {
 	values := make(map[string]MMSTelegram)
 
 	for dataRef, modelNode := range report.reportedDataSetMembersMap {
+
 		if modelNode.getMmsDataObj().structure != nil {
 			l.parceModelNode(modelNode.getMmsDataObj(), modelNode.getObjectReference().toString(), dataRef, values)
 		} else {
@@ -43,7 +44,6 @@ func Float32frombytes(bytes []byte) float32 {
 func (l *ClientEventListener) getValue(data *Data, dataName string, dataRef string, values map[string]MMSTelegram) {
 	if data.FloatingPoint != nil {
 		value := data.FloatingPoint.value[1:]
-
 		mmsTelegram := MMSTelegram{
 			Type:  MMSValueType(1),
 			Value: Float32frombytes(value),
@@ -62,6 +62,7 @@ func (l *ClientEventListener) getValue(data *Data, dataName string, dataRef stri
 	}
 
 	if data.utcTime != nil {
+
 		if len(data.utcTime.value) > 0 {
 			value := binary.BigEndian.Uint32(data.utcTime.value)
 			if mmsTelegram, ok := values[dataRef]; ok {

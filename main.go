@@ -8,7 +8,7 @@ import (
 func main() {
 
 	//variableBufReport := []string{"DemoMeasurement/LLN0.brcb1"}
-	variableUnBufReport := []string{"ied1lDevice1/LLN0.urcb101", "Bresler43LD1/LLN0.urcbH01", "D001CTRL/LLN0.urcbCTRL_C01", "ied1lDevice1/LLN0.urcb102"}
+	variableUnBufReport := []string{"ied1lDevice1/LLN0.urcb101", "DemoMeasurement/LLN0.urcb1", "D001CTRL/LLN0.urcbCTRL_C01", "ied1lDevice1/LLN0.urcb102"}
 	var err error
 	clientSap := src.NewClientSap()
 	event := src.NewClientEventListener()
@@ -25,8 +25,8 @@ func main() {
 
 	*/
 	err = src.ConnectToUnBufferReport(association,
-		variableUnBufReport[0],
-		false, "urbc111")
+		variableUnBufReport[1],
+		true, "urbc1")
 
 	src.GetTreeSl(association)
 
@@ -37,9 +37,8 @@ func main() {
 				return
 			}
 
-			for name, val := range report.Values {
-				log.Println(name)
-				log.Println(val.Name)
+			for _, val := range report.Values {
+				log.Println("time", val.Time, "value ", val.Value, "name", val.Name, "type", val.Type)
 			}
 		}
 	}
